@@ -1,0 +1,66 @@
+package command
+
+import net.il.FSHelper
+import net.il.Logger
+import net.il.util.CommandConstants
+import message.SerializationHandler
+
+/**
+ * Utility object for quickly parsing subprocess commands from a given JSON file
+ */
+object CommandBuilder {
+    /**
+     * Takes a path of a subprocess command schema, and parses the file contents into a list
+     * of subprocess command objects
+     *
+     * @param schemaPath path to schema file from which the JSON text will be read
+     * @return list of decoded subprocess objects
+     */
+    fun buildCommands(schemaPath: String = CommandConstants.COMMAND_SCHEMA_PATH): List<Subprocess>? = try {
+        FSHelper.getFileText(schemaPath)?.let {
+            val list = parseCommandListFile(it)
+            with(arrayListOf<Subprocess>()) {
+                list?.forEach { sp -> add(sp) }
+                this
+            }
+        }
+    } catch (e: Exception) {
+        Logger.error(e)
+        null
+    }
+
+    /**
+     * Takes a path of a program path configuration JSON file, and reads/parses the text into a [CommandConfig] instance
+     *
+     * @param configPath path to file located within module resource directory
+     * @return decoded command config object
+     */
+    fun buildConfig(configPath: String = CommandConstants.PROGRAM_PATHS_PATH): CommandConfig? = try {
+        FSHelper.getFileText(configPath)?.let { s ->
+            SerializationHandler.serializableFromString(s)
+        }
+    } catch (e: Exception) {
+        Logger.error(e)
+        null
+    }
+    /**
+     * Compartmentalized method for handling the parsing of the schema file text into operable subprocess objects
+     *
+     * @param schemaString file content as a string
+     * @return list of parsed subprocess objects
+     */
+    private fun parseCommandListFile(schemaString: String): List<Subprocess>? = try {
+        val cmdArray = SerializationHandler.parseJsonArrayFromString(schemaString)
+        with(arrayListOf<Subprocess>()) {
+            cmdArray?.forEach {
+                SerializationHandler.serializableFromElement<Subprocess>(it)?.let { cmd ->
+                    add(cmd)
+                }
+            }
+            toList()
+        }
+    } catch (e: Exception) {
+        Logger.error(e)
+        null
+    }
+}
