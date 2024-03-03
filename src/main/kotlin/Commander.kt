@@ -13,6 +13,7 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.flowOn
+import message.SerializationHandler
 import net.il.util.Logger
 import java.io.BufferedReader
 import java.io.File
@@ -25,8 +26,10 @@ import java.util.*
 class Commander {
     //region Properties
 
-    private val commands = ConfigBuilder.buildCommands() ?: listOf()
-    private val config = ConfigBuilder.buildConfig() ?: IngenConfig()
+    private val commands = ConfigBuilder.buildCommands()
+        ?: SerializationHandler.serializableFromString(IngenDefaults.DEFAULT_COMMANDS)
+    private val config = ConfigBuilder.buildConfig()
+        ?: SerializationHandler.serializableFromString(IngenDefaults.DEFAULT_CONFIG)
     private val sessions = arrayListOf<Session>()
 
     //endregion
@@ -530,9 +533,10 @@ class Commander {
      * @return path of program to be executed, per the configuration values provided per program
      */
     private fun getCommandPath(code: Int): String =
-        config.paths.values
-            .first { it.code == code }
-            .path
+        config?.paths?.values
+            ?.first { it.code == code }
+            ?.path
+            ?: throw RuntimeException("Cannot retrieve command path...")
 
     /**
      * Gets the working directory [File] object of the given command by appending the nested directory path to the
@@ -543,8 +547,9 @@ class Commander {
      */
     private fun getWorkingDirectoryPath(ex: ISubprocess) : String {
         return if (ex.command.directory.isNotBlank()) {
-            "${config.runtimeDirectory}${ex.command.directory}"
-        } else config.runtimeDirectory
+            "${config?.runtimeDirectory}${ex.command.directory}"
+        } else config?.runtimeDirectory
+            ?: throw RuntimeException("Cannot retrieve working dir...")
     }
 
     private fun endSession(ex: ISubprocess) {

@@ -2,7 +2,7 @@
   {
     "id": 0,
     "command": {
-      "tag": "simple echo command",
+      "tag": "TEST",
       "alias": "",
       "directory": "",
       "escape": null,
@@ -13,7 +13,7 @@
   {
     "id": 1,
     "command": {
-      "tag": "simple interactive python script",
+      "tag": "TEST",
       "alias": "module/input_test.py",
       "directory": "",
       "escape": "xx",
@@ -24,7 +24,7 @@
   {
     "id": 2,
     "command": {
-      "tag": "simple FIFO async emitter",
+      "tag": "TEST",
       "alias": "./module/mock_async_emitter",
       "directory": "",
       "escape": "",
@@ -35,7 +35,7 @@
   {
     "id": 3,
     "command": {
-      "tag": "",
+      "tag": "TEST",
       "alias": "test",
       "directory": "test",
       "escape": "",
@@ -46,7 +46,7 @@
   {
     "id": 4,
     "command": {
-      "tag": "",
+      "tag": "TEST",
       "alias": "test",
       "directory": "test",
       "escape": "",
@@ -57,7 +57,7 @@
   {
     "id": 5,
     "command": {
-      "tag": "",
+      "tag": "TEST",
       "alias": "test",
       "directory": "test",
       "escape": "",
@@ -68,7 +68,7 @@
   {
     "id": 6,
     "command": {
-      "tag": "",
+      "tag": "TEST",
       "alias": "test",
       "directory": "test",
       "escape": "",
@@ -79,7 +79,7 @@
   {
     "id": 7,
     "command": {
-      "tag": "",
+      "tag": "TEST",
       "alias": "test",
       "directory": "test",
       "escape": "",

@@ -2,32 +2,37 @@ package net.il
 
 object IngenDefaults {
     val DEFAULT_CONFIG: String
-        get() = """
-            {
-              "PATH_MAP": {
-                "SHELL": {
-                  "CODE": 0,
-                  "PATH": "/bin/bash"
-                },
-                "EXEC": {
-                  "CODE": 1,
-                  "PATH": ""
-                },
-                "ECHO": {
-                  "CODE": 2,
-                  "PATH": "/bin/echo"
-                },
-                "PYTHON": {
-                  "CODE": 3,
-                  "PATH": "`whereis python`"
+        get() {
+            val esc = "\$HOME"
+            val concat = """
+                {
+                  "PATH_MAP": {
+                    "SHELL": {
+                      "CODE": 0,
+                      "PATH": "/bin/bash"
+                    },
+                    "EXEC": {
+                      "CODE": 1,
+                      "PATH": ""
+                    },
+                    "ECHO": {
+                      "CODE": 2,
+                      "PATH": "/bin/echo"
+                    },
+                    "PYTHON": {
+                      "CODE": 3,
+                      "PATH": "$esc/.pyenv/shims/python"
+                    }
+                  },
+                  "RUNTIME_DIR": "~/.ingen",
+                  "ENV": {
+                    "GDM_SCALE": "1.5"
+                  }
                 }
-              },
-              "RUNTIME_DIR": "~/.viper",
-              "ENV": {
-                "GDM_SCALE": "1.5"
-              }
-            }
-        """.trimIndent()
+            """.trimIndent()
+            return concat
+        }
+
 
     val DEFAULT_COMMANDS: String
         get() = """

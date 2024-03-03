@@ -6,7 +6,8 @@ import kotlin.io.path.absolutePathString
 object CommandConstants {
     private const val SCHEMA_FILE_NAME = "command.json"
     private const val PROGRAM_PATHS_FILE_NAME = "config/ingen.json"
-    const val COMMAND_SCHEMA_PATH = "json/$SCHEMA_FILE_NAME"
+    val COMMAND_SCHEMA_PATH =
+        "${SysConstants.PROJECT_ROOT}/$SCHEMA_FILE_NAME"
     const val PROGRAM_PATHS_PATH = "json/$PROGRAM_PATHS_FILE_NAME"
 }
 

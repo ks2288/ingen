@@ -1,9 +1,9 @@
+import net.il.IngenConfig
+import net.il.util.FSHelper
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import java.io.File
-import net.il.IngenConfig
-import net.il.util.FSHelper
 
 class FSHelperTest {
     private var config = IngenConfig()

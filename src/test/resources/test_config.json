@@ -1,0 +1,28 @@
+{
+  "PATH_MAP": {
+    "SHELL": {
+      "CODE": 0,
+      "PATH": "TEST"
+    },
+    "EXEC": {
+      "CODE": 1,
+      "PATH": ""
+    },
+    "ECHO": {
+      "CODE": 2,
+      "PATH": "TEST"
+    },
+    "PYTHON": {
+      "CODE": 3,
+      "PATH": "TEST"
+    },
+    "BLE": {
+      "CODE": 4,
+      "PATH": "TEST"
+    }
+  },
+  "RUNTIME_DIR": "TEST",
+  "ENV": {
+    "GDM_SCALE": "TEST"
+  }
+}

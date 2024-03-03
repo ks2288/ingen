@@ -19,5 +19,7 @@ object TestConstants {
     )
     val TEST_UBYTE_ARRAY_CRC16 = 17850.toUShort()
     private val TEST_RES_DIR = "${SysConstants.PROJECT_ROOT}/src/test/resources"
-    private val MAIN_RES_DIR = "${SysConstants.PROJECT_ROOT}/src/main/resources"
+    val TEST_COMMAND_FILE_PATH = "$TEST_RES_DIR/test_cmd.json"
+    val TEST_CONFIG_FILE_PATH = "$TEST_RES_DIR/test_config.json"
+
 }
