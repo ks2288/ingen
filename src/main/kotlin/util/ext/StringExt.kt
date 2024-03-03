@@ -1,6 +1,6 @@
 package util.ext
 
-import net.il.Logger
+import net.il.util.Logger
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter

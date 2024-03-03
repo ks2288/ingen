@@ -5,7 +5,7 @@ package message
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import net.il.Logger
+import net.il.util.Logger
 
 /**
  * Simple utility object for leveraging the KotlinX serialization library to turn decodable objects into class instances

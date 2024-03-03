@@ -1,11 +1,17 @@
-package net.il
+@file:OptIn(ExperimentalPathApi::class)
 
+package net.il.util
+
+import net.il.util.FSHelper.BUFFER_SIZE
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
+import java.nio.file.Paths
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.copyToRecursively
 
 /**
  * Utility object for quickly creating files of a given type within the Android app's data directory
@@ -13,9 +19,42 @@ import java.util.zip.ZipOutputStream
  *
  * @property BUFFER_SIZE size of the buffer to be used during file operations
  */
-// TODO: KMP location of actual/expected for platform-specific file system code
+// TODO: KMP actual/expected for platform-specific file system code
 object FSHelper {
     private const val BUFFER_SIZE = 2048
+
+    /**
+     * Creates all directories at a given path and checks their existence using redundant strategies
+     *
+     * @param path path through which to create all needed directories
+     * @return success flag for directory creation OR prior existence; false does NOT mean no directories were made
+     */
+    fun createPathDirectories(path: String): Boolean = try {
+        File(path).mkdirs()
+    } catch (e: Exception) {
+        Logger.error(e)
+        Paths.get(path).toFile().exists()
+    }
+
+    /**
+     * Recursively copies files from a given source path to a given destination path
+     *
+     * @param sourcePath path containing the files to be copied
+     * @param destinationPath path to which the files will be copied
+     * @return success flag designating whether the source directory exists or not
+     */
+    fun copyFilesRecursively(sourcePath: String, destinationPath: String): Boolean = try {
+        val success = createPathDirectories(destinationPath)
+        Logger.debug("Path directories created to $destinationPath: $success")
+        Paths.get(destinationPath).copyToRecursively(
+            target = Paths.get(sourcePath),
+            followLinks = false
+        )
+        File(destinationPath).listFiles()?.isNotEmpty() ?: false
+    } catch (e: Exception) {
+        Logger.error(e)
+        false
+    }
 
     /**
      * Simple wrapper to safely load a file and read/return its text contents
@@ -38,6 +77,7 @@ object FSHelper {
      * @param newFileName name to give the new file
      * @param newFilePath path within which to construct the new file
      * @param fileSizeInBytes size to construct the file with, as well as fill with 0x00
+     * @return blank file of a chosen size at the given path with the given name
      */
     fun getBlankFile(
         directoryPath: String,
@@ -67,6 +107,7 @@ object FSHelper {
      *
      * @param origin origin file whose contents are to be zipped
      * @param dest new file to place the zipped contents within
+     * @return ZIP-formatted file of the original file contents
      */
     // TODO: add new file flag
     fun createZip(
@@ -75,8 +116,8 @@ object FSHelper {
     ): File? = try {
         val out = ZipOutputStream(BufferedOutputStream(dest.outputStream()))
         val data = ByteArray(BUFFER_SIZE)
-        val fi = FileInputStream(origin)
-        val stream = BufferedInputStream(fi, BUFFER_SIZE)
+        val fis = FileInputStream(origin)
+        val stream = BufferedInputStream(fis, BUFFER_SIZE)
         val entry = ZipEntry(dest.name)
         out.putNextEntry(entry)
 

@@ -1,0 +1,24 @@
+[
+  {
+    "id": 0,
+    "command": {
+      "tag": "simple echo command",
+      "alias": "",
+      "directory": "",
+      "escape": null,
+      "typeCode": 0,
+      "pathCode": 2
+    }
+  },
+  {
+    "id": 1,
+    "command": {
+      "tag": "simple interactive python script",
+      "alias": "module/input_test.py",
+      "directory": "",
+      "escape": "xx",
+      "typeCode": 2,
+      "pathCode": 3
+    }
+  }
+]

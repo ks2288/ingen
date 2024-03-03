@@ -1,14 +1,22 @@
 package command
 
-import net.il.FSHelper
-import net.il.Logger
-import net.il.util.CommandConstants
 import message.SerializationHandler
+import net.il.IngenConfig
+import net.il.util.CommandConstants
+import net.il.util.FSHelper
+import net.il.util.Logger
+import net.il.util.SysConstants
 
 /**
  * Utility object for quickly parsing subprocess commands from a given JSON file
  */
-object CommandBuilder {
+object ConfigBuilder {
+
+    fun initializeFS() {
+        val pathSuccess = FSHelper.createPathDirectories(IngenConfig.INGEN_DEFAULT_DIR)
+        Logger.debug("System paths initialized: $pathSuccess")
+    }
+
     /**
      * Takes a path of a subprocess command schema, and parses the file contents into a list
      * of subprocess command objects
@@ -30,12 +38,12 @@ object CommandBuilder {
     }
 
     /**
-     * Takes a path of a program path configuration JSON file, and reads/parses the text into a [CommandConfig] instance
+     * Takes a path of a program path configuration JSON file, and reads/parses the text into a [IngenConfig] instance
      *
      * @param configPath path to file located within module resource directory
      * @return decoded command config object
      */
-    fun buildConfig(configPath: String = CommandConstants.PROGRAM_PATHS_PATH): CommandConfig? = try {
+    fun buildConfig(configPath: String = CommandConstants.PROGRAM_PATHS_PATH): IngenConfig? = try {
         FSHelper.getFileText(configPath)?.let { s ->
             SerializationHandler.serializableFromString(s)
         }

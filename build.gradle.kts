@@ -5,6 +5,7 @@ val kotlinxCoroutinesTestName: String by project
 val kotlinxSerialVersion: String by project
 val kotlinxJsonSerializerName: String by project
 val kotlinTestName: String by project
+val kotlinTestVersion: String by project
 val rxJavaName: String by project
 val rxjavaVersion: String by project
 val rxKotlinVersion: String by project
@@ -28,13 +29,11 @@ dependencies {
     implementation("$kotlinxJsonSerializerName:$kotlinxSerialVersion")
     implementation("$rxKotlinName:$rxKotlinVersion")
     implementation("$rxJavaName:$rxjavaVersion")
-    testImplementation(kotlinTestName)
+    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))
     testImplementation("$kotlinxCoroutinesTestName:$kotlinxVersion")
 }
 
-tasks.test {
-    useJUnitPlatform()
-}
 kotlin {
     jvmToolchain(17)
 }

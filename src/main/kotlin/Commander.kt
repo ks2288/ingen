@@ -2,7 +2,10 @@
 
 package net.il
 
-import command.*
+import command.ConfigBuilder
+import command.ISubprocess
+import command.Session
+import command.Subprocess
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -10,6 +13,7 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.flowOn
+import net.il.util.Logger
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileNotFoundException
@@ -21,8 +25,8 @@ import java.util.*
 class Commander {
     //region Properties
 
-    private val commands = CommandBuilder.buildCommands() ?: listOf()
-    private val config = CommandBuilder.buildConfig() ?: CommandConfig()
+    private val commands = ConfigBuilder.buildCommands() ?: listOf()
+    private val config = ConfigBuilder.buildConfig() ?: IngenConfig()
     private val sessions = arrayListOf<Session>()
 
     //endregion
@@ -89,8 +93,7 @@ class Commander {
     }
 
     /**
-     * Monitors asynchronous system program execution/output spawned with
-     * [ProcessBuilder] through coroutines
+     * Monitors asynchronous system program execution/output spawned with [ProcessBuilder] via coroutines
      *
      * @param executable subprocess command object containing all necessary information
      * @param userArgs string array containing the process args
@@ -553,6 +556,7 @@ class Commander {
             Logger.debug("Subprocess terminated\n\tID: $pid\n\tTAG: ${ex.command.tag}\n")
         } catch (e: Exception) { Logger.error(e) }
     }
+
     /**
      * Builds an arguments list to be passed to the active [ProcessBuilder], including both the program path
      * (i.e. /bin/echo), any corresponding alias values (a python script file name, for example) and any user-supplied

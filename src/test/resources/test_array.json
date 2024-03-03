@@ -1,0 +1,12 @@
+[
+  {
+    "stringKey": "test string 1",
+    "intKey": 0,
+    "boolKey": false
+  },
+  {
+    "stringKey": "test string 2",
+    "intKey": 1,
+    "boolKey": true
+  }
+]

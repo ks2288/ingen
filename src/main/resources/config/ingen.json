@@ -1,0 +1,28 @@
+{
+  "PATH_MAP": {
+    "SHELL": {
+      "CODE": 0,
+      "PATH": "/bin/bash"
+    },
+    "EXEC": {
+      "CODE": 1,
+      "PATH": ""
+    },
+    "ECHO": {
+      "CODE": 2,
+      "PATH": "/bin/echo"
+    },
+    "PYTHON": {
+      "CODE": 3,
+      "PATH": "/Users/kenny/.pyenv/shims/python"
+    },
+    "BLE": {
+      "CODE": 4,
+      "PATH": "bluetoothctl"
+    }
+  },
+  "RUNTIME_DIR": "/Users/kenny/.viper",
+  "ENV": {
+    "GDM_SCALE": "1.5"
+  }
+}

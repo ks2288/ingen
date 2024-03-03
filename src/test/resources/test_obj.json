@@ -1,0 +1,13 @@
+{
+  "stringKey": "test string",
+  "intKey": 0,
+  "boolKey": false,
+  "arrayKey": [
+    {
+      "index": "test index 1"
+    },
+    {
+      "index": "test index 2"
+    }
+  ]
+}
