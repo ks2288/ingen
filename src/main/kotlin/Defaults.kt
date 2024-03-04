@@ -21,10 +21,10 @@ object IngenDefaults {
                     },
                     "PYTHON": {
                       "CODE": 3,
-                      "PATH": "$esc/.pyenv/shims/python"
+                      "PATH": "${System.getProperty("user.home")}/.pyenv/shims/python"
                     }
                   },
-                  "RUNTIME_DIR": "~/.ingen",
+                  "RUNTIME_DIR": "${System.getProperty("user.home")}/.ingen",
                   "ENV": {
                     "GDM_SCALE": "1.5"
                   }

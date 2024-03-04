@@ -1,4 +1,5 @@
 import command.Command
+import command.ConfigBuilder
 import command.ProcessType
 import command.Subprocess
 import io.reactivex.rxjava3.core.BackpressureStrategy
@@ -26,6 +27,7 @@ class CommandExecutionTest {
 
     @Before
     fun setup() {
+        ConfigBuilder.initializeFS()
         commander = Commander()
         outputPublisher = BehaviorProcessor.create()
         inputPublisher = BehaviorProcessor.create()
@@ -67,7 +69,6 @@ class CommandExecutionTest {
             typeCode = ProcessType.POLL.ordinal,
             pathCode = 2,
             tag = "test command using /bin/echo"
-
         )
         val echoCmd = Subprocess(
             id = 1,

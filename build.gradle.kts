@@ -37,3 +37,14 @@ dependencies {
 kotlin {
     jvmToolchain(17)
 }
+
+//tasks.register<Exec>("Ingen Filesystem Setup") {
+//    val homePath = System.getProperty("user.home")
+//    workingDir = File(homePath)
+//    if (workingDir.exists()) {
+//
+//    } else workingDir.mkdirs()
+//
+//    this.
+//    commandLine(listOf(""))
+//}

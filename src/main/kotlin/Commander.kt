@@ -13,7 +13,6 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.flowOn
-import message.SerializationHandler
 import net.il.util.Logger
 import java.io.BufferedReader
 import java.io.File
@@ -27,9 +26,7 @@ class Commander {
     //region Properties
 
     private val commands = ConfigBuilder.buildCommands()
-        ?: SerializationHandler.serializableFromString(IngenDefaults.DEFAULT_COMMANDS)
     private val config = ConfigBuilder.buildConfig()
-        ?: SerializationHandler.serializableFromString(IngenDefaults.DEFAULT_CONFIG)
     private val sessions = arrayListOf<Session>()
 
     //endregion
