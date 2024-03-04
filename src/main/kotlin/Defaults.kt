@@ -3,8 +3,7 @@ package net.il
 object IngenDefaults {
     val DEFAULT_CONFIG: String
         get() {
-            val esc = "\$HOME"
-            val concat = """
+            return """
                 {
                   "PATH_MAP": {
                     "SHELL": {
@@ -30,7 +29,6 @@ object IngenDefaults {
                   }
                 }
             """.trimIndent()
-            return concat
         }
 
 

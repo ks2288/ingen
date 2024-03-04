@@ -4,11 +4,13 @@ import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 
 object CommandConstants {
-    private const val SCHEMA_FILE_NAME = "command.json"
-    private const val PROGRAM_PATHS_FILE_NAME = "config/ingen.json"
+    private const val COMMANDS_FILE_NAME = "config/commands.json"
+    private const val CONFIG_FILE_NAME = "config/ingen.json"
+    private val DEPLOYMENT_DIRECTORY = "${System.getProperty("user.home")}/.ingen"
     val COMMAND_SCHEMA_PATH =
-        "${SysConstants.PROJECT_ROOT}/$SCHEMA_FILE_NAME"
-    const val PROGRAM_PATHS_PATH = "json/$PROGRAM_PATHS_FILE_NAME"
+        "$DEPLOYMENT_DIRECTORY/$COMMANDS_FILE_NAME"
+    val CONFIG_FILE_PATH = "$DEPLOYMENT_DIRECTORY/$CONFIG_FILE_NAME"
+    val LOG_DIR = "$DEPLOYMENT_DIRECTORY/log"
 }
 
 object SysConstants {

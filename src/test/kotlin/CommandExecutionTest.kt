@@ -13,7 +13,9 @@ import net.il.util.SysConstants
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import util.TestConstants
 import java.io.File
+import kotlin.test.fail
 
 class CommandExecutionTest {
     private lateinit var commander: Commander
@@ -39,18 +41,18 @@ class CommandExecutionTest {
             decoded?.let { sp -> execList.add(sp) }
         }
         mockAsyncCommandRx = Command(
-            programAlias = MOCK_SCANNER_ALIAS,
-            directory = TEST_RES_DIR,
+            programAlias = TestConstants.ASYNC_SHELL_SCRIPT_PATH,
+            directory = "",
             typeCode = ProcessType.ASYNC.ordinal,
-            pathCode = 1,
+            pathCode = 0,
             tag = "test executable value emitter shell script"
         )
 
         mockAsyncCommandCoroutines = Command(
-            programAlias = MOCK_EMITTER_ALIAS,
+            programAlias = TestConstants.ASYNC_PYTHON_SCRIPT_PATH,
             directory = "",
             typeCode = ProcessType.ASYNC.ordinal,
-            pathCode = 3,
+            pathCode = 2,
             tag = "test executable value emitter python script"
         )
     }
@@ -67,7 +69,7 @@ class CommandExecutionTest {
             programAlias = "",
             directory = "",
             typeCode = ProcessType.POLL.ordinal,
-            pathCode = 2,
+            pathCode = 1,
             tag = "test command using /bin/echo"
         )
         val echoCmd = Subprocess(
@@ -96,7 +98,7 @@ class CommandExecutionTest {
                     out.add(it)
                 },
                 onError = {
-                    throw it
+                    fail()
                 },
                 onComplete = {
                     assert(out.size == EXPECTED_MONITOR_OUTPUT_SIZE)
@@ -111,16 +113,15 @@ class CommandExecutionTest {
     }
 
     @Test
-    fun test_process_monitor() {
+    fun test_execute_async() {
         runTest {
             val out = arrayListOf<String>()
-
             val sp = Subprocess(
                 id = 2,
                 command = mockAsyncCommandCoroutines
             )
 
-            commander.subprocessChannelFlow(
+            commander.executeAsync(
                 executable = sp,
                 userArgs = listOf(),
             ).collect {
@@ -137,8 +138,6 @@ class CommandExecutionTest {
         private const val JSON_ARRAY_FILE_NAME = "test_cmd.json"
         private val JSON_ARRAY_FILE_PATH = "$TEST_RES_DIR/$JSON_ARRAY_FILE_NAME"
         private const val ECHO_CONTENT = "test echo"
-        private const val MOCK_SCANNER_ALIAS = "./mock_async_emitter.sh"
-        private val MOCK_EMITTER_ALIAS = "${TEST_RES_DIR}/test_emitter.py"
         private const val EXPECTED_MONITOR_OUTPUT_SIZE = 10
         private const val EXPECTED_COROUTINES_RESULTS_SIZE = 5
     }

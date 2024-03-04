@@ -57,7 +57,7 @@ interface ISubprocess {
      * @param userArgs list of user-supplied command arguments
      * @return compiled list of all command args, including user-supplied
      */
-    fun toArgsList(userArgs: List<String>): List<String>? {
+    fun toArgsList(userArgs: List<String>): List<String> {
         return with(arrayListOf<String>()) {
             add(command.programAlias)
             addAll(userArgs)

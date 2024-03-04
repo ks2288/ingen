@@ -52,7 +52,7 @@ object ConfigBuilder {
      * @param configPath path to file located within module resource directory
      * @return decoded command config object
      */
-    fun buildConfig(configPath: String = CommandConstants.PROGRAM_PATHS_PATH): IngenConfig? = try {
+    fun buildConfig(configPath: String = CommandConstants.CONFIG_FILE_PATH): IngenConfig? = try {
         FSHelper.getFileText(configPath)?.let { s ->
             SerializationHandler.serializableFromString(s)
         } ?: SerializationHandler.serializableFromString(IngenDefaults.DEFAULT_CONFIG)
