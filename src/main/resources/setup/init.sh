@@ -9,4 +9,5 @@ Creating runtime directories at $RUNTIME_DIR
 
 "
 mkdir "$RUNTIME_DIR"
+mkdir "$LOG_DIR"
 
