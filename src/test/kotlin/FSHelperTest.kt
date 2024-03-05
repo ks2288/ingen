@@ -33,6 +33,6 @@ class FSHelperTest {
     }
 
     companion object {
-        const val TEST_DIR = "/.ingen_test"
+        const val TEST_DIR = "/.test"
     }
 }
