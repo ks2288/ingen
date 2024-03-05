@@ -24,7 +24,6 @@ class ConfigBuilderTest {
 
     @Test
     fun testBuildConfigFromFile() {
-        // intentionally give this a bad path to force default val parsing
         val config = ConfigBuilder.buildConfig(TestConstants.TEST_CONFIG_FILE_PATH)
         with(config) {
             this?.let {
