@@ -21,7 +21,7 @@
       "PATH": "bluetoothctl"
     }
   },
-  "RUNTIME_DIR": "/Users/kenny/.viper",
+  "RUNTIME_DIR": "${HOME}/.ingen",
   "ENV": {
     "GDM_SCALE": "1.5"
   }
