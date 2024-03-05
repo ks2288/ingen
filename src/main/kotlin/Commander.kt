@@ -14,10 +14,7 @@ import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.flowOn
 import net.il.util.CommandConstants
 import net.il.util.Logger
-import java.io.BufferedReader
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.InputStreamReader
+import java.io.*
 import java.nio.file.FileSystems
 import java.nio.file.StandardWatchEventKinds
 import java.util.*
@@ -38,58 +35,49 @@ class Commander {
      *
      * @param executable subprocess command object containing all necessary information
      * @param userArgs string array containing the process args
-     * @return "stringified" response from process's stdout
+     * @return text of process's stdout
      */
     fun execute(
         executable: ISubprocess,
         userArgs: List<String>,
     ): String {
-        val sb = StringBuilder()
-        val lb = StringBuilder()
+        val outputBuilder = StringBuilder()
+        val logBuilder = StringBuilder()
         val wdp = getWorkingDirectoryPath(executable)
+        val args = buildArguments(executable, userArgs)
         try {
-            val pb = ProcessBuilder()
-            with(pb) {
-                directory(File(wdp))
-                Logger.debug("Working dir for proc builder: ${directory()}")
-                val cmdArgs = buildArguments(
-                    ex = executable,
-                    userArgs = userArgs
-                )
-                command(cmdArgs)
-            }
-
+            val pb = buildProcess(workingDir = wdp, args = args)
             val process = pb.start()
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val errorReader = BufferedReader(InputStreamReader(process.errorStream))
 
             reader.forEachLine {
                 Logger.debug("[CMDR] Subprocess output received: $it")
-                lb.appendLine("${Calendar.getInstance().time}: $it")
-                sb.appendLine(it)
+                logBuilder.appendLine("${Calendar.getInstance().time}: $it")
+                outputBuilder.appendLine(it)
             }
             errorReader.forEachLine {
                 Logger.debug("[CMDR] Subprocess error received: $it")
-                lb.appendLine("${Calendar.getInstance().time}: $it")
-                sb.appendLine(it)
+                logBuilder.appendLine("${Calendar.getInstance().time}: $it")
+                outputBuilder.appendLine(it)
             }
 
             val exitVal = process.waitFor()
             with("Subprocess exited with code: $exitVal") {
                 Logger.debug(this)
-                lb.appendLine("\n${Calendar.getInstance().time}: $this")
+                logBuilder.appendLine("\n${Calendar.getInstance().time}: $this")
             }
         } catch (e: Exception) {
             with("[CMDR] Subprocess exited with error: ${e.localizedMessage}") {
                 Logger.error(this)
-                lb.appendLine("${Calendar.getInstance().time}: $this")
-                sb.appendLine(this)
+                logBuilder.appendLine("${Calendar.getInstance().time}: $this")
+                outputBuilder.appendLine(this)
             }
 
         } finally {
-            logToFile(lb.toString(), userArgs, wdp, executable.id.toString())
+            logToFile(logBuilder.toString(), userArgs, wdp, executable.id.toString())
         }
-        return sb.toString()
+        return outputBuilder.toString()
     }
 
     /**
@@ -106,7 +94,7 @@ class Commander {
      * @param userArgs string array containing the process args
      * @return coroutine channel flow for monitoring subprocess output
      */
-    fun executeAsync(
+    fun executeChannelFlow(
         executable: ISubprocess,
         userArgs: List<String>,
     ) = channelFlow {
@@ -114,33 +102,29 @@ class Commander {
         val wdp = getWorkingDirectoryPath(executable)
         val args = buildArguments(executable, userArgs)
         try {
-            val pb = ProcessBuilder()
-            val dirFile = File(wdp)
+            val pb = buildProcess(
+                workingDir = wdp,
+                args = args,
+                redirectInput = true,
+                redirectError = true
+            )
 
-            with(pb) {
-                directory(dirFile)
-                redirectInput()
-                redirectError()
-                println("Working dir for proc builder: ${directory()}")
-                command(args)
-            }
+            val process = pb.start()
+            sessions.add(Session(process, executable.id))
 
-            val proc = pb.start()
-            sessions.add(Session(proc, executable.id))
-
-            proc.inputStream.bufferedReader().forEachLine { string ->
+            process.inputStream.bufferedReader().forEachLine { string ->
                 println("[CMDR] CGI process output received: $string")
                 sb.appendLine("${Calendar.getInstance().time}: $string")
                 launch { channel.trySend(string) }
             }
 
-            proc.errorStream.bufferedReader().forEachLine { string ->
+            process.errorStream.bufferedReader().forEachLine { string ->
                 println("[CMDR] CGI process error received: $string")
                 sb.appendLine("${Calendar.getInstance().time}: $string")
                 launch { channel.trySend(string) }
             }
 
-            val exitVal = proc.waitFor()
+            val exitVal = process.waitFor()
             with("Subprocess exited with code: $exitVal") {
                 println(this)
                 sb.appendLine("\n${Calendar.getInstance().time}: $this")
@@ -175,33 +159,29 @@ class Commander {
         val wdp = getWorkingDirectoryPath(executable)
         val args = buildArguments(executable, userArgs)
         try {
-            val pb = ProcessBuilder()
-            val wdf = File(wdp)
+            val pb = buildProcess(
+                workingDir = wdp,
+                args = args,
+                redirectInput = true,
+                redirectError = true
+            )
 
-            with(pb) {
-                directory(wdf)
-                redirectInput()
-                redirectError()
-                Logger.debug("Working dir for proc builder: ${directory()}")
-                command(args)
-            }
+            val process = pb.start()
+            sessions.add(Session(process, executable.id))
 
-            val proc = pb.start()
-            sessions.add(Session(proc, executable.id))
-
-            proc.inputStream.bufferedReader().forEachLine { string ->
+            process.inputStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] CGI process output received: $string")
                 sb.appendLine("${Calendar.getInstance().time}: $string")
                 launch { channel.send(string) }
             }
 
-            proc.errorStream.bufferedReader().forEachLine { string ->
+            process.errorStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] CGI process error received: $string")
                 sb.appendLine("${Calendar.getInstance().time}: $string")
                 launch { channel.send(string) }
             }
 
-            val exitVal = proc.waitFor()
+            val exitVal = process.waitFor()
             with("Subprocess exited with code: $exitVal") {
                 Logger.debug(this)
                 sb.appendLine("\n${Calendar.getInstance().time}: $this")
@@ -229,41 +209,38 @@ class Commander {
      * @param userArgs string array containing the process args
      * @param outputPublisher output route for subprocess STDOUT
      */
-    fun monitorSubprocess(
+    fun executeRx(
         executable: ISubprocess,
         userArgs: List<String>,
         outputPublisher: BehaviorProcessor<String>,
     ) {
         val sb = StringBuilder()
         val args = buildArguments(executable, userArgs)
-        val dir = getWorkingDirectoryPath(executable)
-        val pb = ProcessBuilder()
-        val dirFile = File(dir)
+        val wdp = getWorkingDirectoryPath(executable)
         try {
-            with(pb) {
-                directory(dirFile)
-                redirectInput()
-                redirectError()
-                println("Subprocess working directory: $dir")
-                command(args)
-            }
+            val pb = buildProcess(
+                workingDir = wdp,
+                args = args,
+                redirectInput = true,
+                redirectError = true
+            )
 
-            val proc = pb.start()
-            sessions.add(Session(proc, executable.id))
+            val process = pb.start()
+            sessions.add(Session(process, executable.id))
 
-            proc.inputStream.bufferedReader().forEachLine { string ->
+            process.inputStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] Subprocess output received: $string")
                 sb.appendLine("${Calendar.getInstance().time}: $string")
                 outputPublisher.onNext(string)
             }
 
-            proc.errorStream.bufferedReader().forEachLine { string ->
+            process.errorStream.bufferedReader().forEachLine { string ->
                 Logger.error("[CMDR] Subprocess error received: $string")
                 sb.appendLine("${Calendar.getInstance().time}: $string")
                 outputPublisher.onNext(string)
             }
 
-            val exitVal = proc.waitFor()
+            val exitVal = process.waitFor()
             outputPublisher.onComplete()
 
             with("Subprocess exited with code: $exitVal") {
@@ -277,7 +254,7 @@ class Commander {
             }
             outputPublisher.onError(e)
         } finally {
-            logToFile(sb.toString(), userArgs, dir, executable.id.toString())
+            logToFile(sb.toString(), userArgs, wdp, executable.id.toString())
             endSession(executable)
         }
     }
@@ -292,7 +269,7 @@ class Commander {
      * @param outputPublisher output route for subprocess STDOUT
      * @param receiverScope coroutine scope of caller
      */
-    fun monitorControlChannel(
+    fun executeRxInteractive(
         executable: ISubprocess,
         userArgs: List<String>,
         inputPublisher: BehaviorProcessor<String>,
@@ -303,29 +280,21 @@ class Commander {
         val args = buildArguments(executable, userArgs)
         val wdp = getWorkingDirectoryPath(executable)
         try {
-            val wdf = File(wdp)
-            val pb = ProcessBuilder()
-
-            with(pb) {
-                directory(wdf)
-                println("Subprocess working directory: $wdp")
-                command(args)
-            }
-
-            val proc = pb.start()
-            sessions.add(Session(proc, executable.id))
+            val pb = buildProcess(workingDir = wdp, args = args)
+            val process = pb.start()
+            sessions.add(Session(process, executable.id))
 
             // background job for accepting input and writing to subproc STDIN
             receiverScope.launch {
                 inputPublisher.subscribe { sig ->
                     if (sig == "SIGKILL") {
-                        proc.outputStream.close()
-                        proc.inputStream.close()
-                        proc.errorStream.close()
-                        proc.destroyForcibly()
+                        process.outputStream.close()
+                        process.inputStream.close()
+                        process.errorStream.close()
+                        process.destroyForcibly()
                     }
                     println("Input queued: $sig")
-                    with(proc.outputStream.bufferedWriter()) {
+                    with(process.outputStream.bufferedWriter()) {
                         write(sig)
                         newLine()
                         flush()
@@ -333,7 +302,7 @@ class Commander {
                 }
             }
 
-            proc.inputStream.bufferedReader().forEachLine { string ->
+            process.inputStream.bufferedReader().forEachLine { string ->
                 if (string.isNotBlank()) {
                     println("[CMDR] CGI process output received: $string")
                     sb.appendLine("${Calendar.getInstance().time}: $string")
@@ -341,13 +310,13 @@ class Commander {
                 }
             }
 
-            proc.errorStream.bufferedReader().forEachLine { string ->
+            process.errorStream.bufferedReader().forEachLine { string ->
                 println("[CMDR] CGI process error received: $string")
                 sb.appendLine("${Calendar.getInstance().time}: $string")
                 outputPublisher.onNext(string)
             }
 
-            val exitVal = proc.waitFor()
+            val exitVal = process.waitFor()
 
             with("Subprocess exited with code: $exitVal") {
                 Logger.debug(this)
@@ -392,7 +361,7 @@ class Commander {
         }
 
         while (hold) {
-            spawnWatchService(
+            executeFileWatch(
                 executable,
                 args,
                 watchDirectory,
@@ -406,7 +375,7 @@ class Commander {
     /**
      * Spawns an async file watch service that grabs input created by the QR
      * scanner hardware, and reports it to the observer on subproc conclusion;
-     * this method DOES NOT work in the same way as [monitorSubprocess]; rather,
+     * this method DOES NOT work in the same way as [executeRx]; rather,
      * it works identically to [collectAsync] in that the flow is cold,
      * and it will only return values when the subprocess exits; in other words,
      * this is NOT a continuous monitor, and it needs to be re-initiated after
@@ -418,32 +387,25 @@ class Commander {
      * @param watchDirectory directory to be watched for file changes
      * @param outputPublisher output route for subprocess STDOUT
      */
-    fun spawnWatchService(
+    fun executeFileWatch(
         executable: ISubprocess,
         userArgs: List<String>,
         watchDirectory: String,
         outputPublisher: BehaviorProcessor<String>,
     ) {
-        val sb = StringBuilder()
+        val outputBuilder = StringBuilder()
         val args = buildArguments(executable, userArgs)
         val wdp = getWorkingDirectoryPath(executable)
         try {
-            val pb = ProcessBuilder()
-            val wdf = File(wdp)
+            val pb = buildProcess(
+                workingDir = wdp,
+                args = args,
+                redirectInput = true,
+                redirectError = true
+            )
 
-            with(pb) {
-                directory(wdf)
-                redirectInput()
-                redirectError()
-                with("Target dir for watch service: $watchDirectory") {
-                    println(this)
-                    sb.appendLine(this)
-                }
-                command(args)
-            }
-
-            val proc = pb.start()
-            with(proc) {
+            val process = pb.start()
+            with(process) {
                 println(
                     """
                     Subprocess created:
@@ -470,7 +432,7 @@ class Commander {
                 f.deleteOnExit()
                 f.reader().forEachLine { str ->
                     println("[CMDR] Watch service output received: $str")
-                    sb.appendLine("${Calendar.getInstance().time}: $str")
+                    outputBuilder.appendLine("${Calendar.getInstance().time}: $str")
                     s += str
                 }
             }
@@ -478,24 +440,24 @@ class Commander {
             watchKey.cancel()
             watchService.close()
             keys.cancel()
-            val exitVal = proc.waitFor()
+            val exitVal = process.waitFor()
             outputPublisher.onNext(s)
 
             with("\nSubprocess exited with code: $exitVal") {
                 Logger.debug(this)
-                sb.appendLine(this)
+                outputBuilder.appendLine(this)
             }
 
             outputPublisher.onComplete()
         } catch (e: Exception) {
             with("Subprocess exited with error: ${e.localizedMessage}") {
                 println(this)
-                sb.appendLine("\n${Calendar.getInstance().time}: $this")
+                outputBuilder.appendLine("\n${Calendar.getInstance().time}: $this")
             }
             outputPublisher.onError(e)
         } finally {
             logToFile(
-                sb.toString(),
+                outputBuilder.toString(),
                 args,
                 wdp,
                 executable.id.toString()
@@ -505,12 +467,12 @@ class Commander {
     }
 
     /**
-     * Simply destroys all running processes
+     * Forcibly destroys any laggard processes; not intended for graceful termination
      */
     fun killAll() {
         sessions.forEach {
-            it.process.destroy()
-            println("Subprocess destroyed with PID: ${it.process.pid()}")
+            it.process.destroyForcibly()
+            println("Subprocess destroyed forcibly with PID: ${it.process.pid()}")
         }
         sessions.clear()
     }
@@ -546,11 +508,18 @@ class Commander {
                 filterNot { it.isBlank() }
                 val sb = StringBuilder()
                 forEach {  s -> sb.append(s) }
-                sb.toString()
+                val s = sb.toString()
+                Logger.debug("Subprocess working directory: $s")
+                s
             }
         } ?: throw RuntimeException("Cannot retrieve IngenConfig...")
     }
 
+    /**
+     * Ends a known session by destroying the JVM subprocess by ID
+     *
+     * @param ex subprocess to cross-reference the session ID from
+     */
     private fun endSession(ex: ISubprocess) {
         try {
             val ended = sessions.first { s -> ex.id == s.subprocessId }
@@ -559,6 +528,35 @@ class Commander {
             sessions.remove(ended)
             Logger.debug("Subprocess terminated\n\tID: $pid\n\tTAG: ${ex.command.tag}\n")
         } catch (e: Exception) { Logger.error(e) }
+    }
+
+    /**
+     * Modular function for building a process for all types of sessions
+     *
+     * @param workingDir working directory from which to spawn the process
+     * @param args full set of built arguments, combining runtime and command directory paths
+     * @param redirectInput process input (STDIO) redirection flag
+     * @param redirectOutput process output (STDIO) redirection flag
+     * @param redirectError process error (STDERR) redirection flag
+     * @return process builder from which the subprocess will be spawned
+     */
+    @Throws(IOException::class, FileNotFoundException::class)
+    private fun buildProcess(
+        workingDir: String,
+        args: List<String>,
+        redirectInput: Boolean = false,
+        redirectOutput: Boolean = false,
+        redirectError: Boolean = false
+    ): ProcessBuilder {
+        val wdf = File(workingDir)
+        if (wdf.exists().not()) throw FileNotFoundException()
+        return with(ProcessBuilder()) {
+            if (redirectInput) redirectInput()
+            if (redirectOutput) redirectOutput()
+            if (redirectError) redirectError()
+            directory(wdf)
+            command(args)
+        }
     }
 
     /**

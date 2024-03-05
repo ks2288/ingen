@@ -82,7 +82,7 @@ class CommandExecutionTest {
     }
 
     @Test
-    fun test_subproc_monitor_rx() {
+    fun test_execute_rx() {
         val exec = Subprocess(
             command = mockAsyncCommandRx,
             id = 0
@@ -100,20 +100,20 @@ class CommandExecutionTest {
                 onError = {
                     fail()
                 },
-                onComplete = {
-                    assert(out.size == EXPECTED_MONITOR_OUTPUT_SIZE)
-                }
+                onComplete = {}
             )
 
-        commander.monitorSubprocess(
+        commander.executeRx(
             executable = exec,
             userArgs = listOf(),
             outputPublisher = outputPublisher
         )
+
+        runTest { assert(out.size == EXPECTED_MONITOR_OUTPUT_SIZE) }
     }
 
     @Test
-    fun test_execute_async() {
+    fun test_execute_channel_flow() {
         runTest {
             val out = arrayListOf<String>()
             val sp = Subprocess(
@@ -121,7 +121,7 @@ class CommandExecutionTest {
                 command = mockAsyncCommandCoroutines
             )
 
-            commander.executeAsync(
+            commander.executeChannelFlow(
                 executable = sp,
                 userArgs = listOf(),
             ).collect {
