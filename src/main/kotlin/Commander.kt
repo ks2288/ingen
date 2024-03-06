@@ -33,7 +33,7 @@ class Commander {
     /**
      * Executes an environment process via the JRE with the given args
      *
-     * @param executable subprocess command object containing all necessary information
+     * @param executable subprocess command object
      * @param userArgs string array containing the process args
      * @return text of process's stdout
      */
