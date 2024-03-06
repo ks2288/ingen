@@ -45,8 +45,8 @@ fun BooleanArray.toByte(): Byte {
 }
 
 /**
- * Converts [BooleanArray] to a [ByteArray] where each byte represents 8 [Boolean]s in the
- * [BooleanArray]
+ * Converts [BooleanArray] to a [ByteArray] where each byte represents 8
+ * [Boolean]s in the [BooleanArray]
  *
  * i.e.
  * Booleans 0...7   -> 0th Byte
@@ -58,14 +58,18 @@ fun BooleanArray.toByte(): Byte {
  */
 fun BooleanArray.toByteArray(): ByteArray {
     val byteArray = MutableList<Byte>(size = 0) { 0 }
-    var cur = 0
-    while (cur + 8 < this.size) {
-        byteArray.add(this.copyOfRange(fromIndex = cur, toIndex = cur + 8).toByte())
-        cur += 8
+    var pos = 0
+    while (pos + 8 < this.size) {
+        byteArray.add(
+            this.copyOfRange(fromIndex = pos, toIndex = pos + 8).toByte()
+        )
+        pos += 8
     }
 
-    if (cur < this.size) {
-        byteArray.add(this.copyOfRange(fromIndex = cur, toIndex = this.size).toByte())
+    if (pos < this.size) {
+        byteArray.add(
+            this.copyOfRange(fromIndex = pos, toIndex = this.size).toByte()
+        )
     }
     return byteArray.toByteArray()
 }
@@ -87,7 +91,8 @@ fun ByteArray.asHex(): String =
         .joinToString("\n")
 
 /**
- * Alternate method for taking a given [ByteArray] and returning a representative hex string, with varying formats
+ * Alternate method for taking a given [ByteArray] and returning a
+ * representative hex string, with varying formats
  *
  * @param format format of calculated hex string
  * @return hex string of the given [ByteArray]
@@ -128,8 +133,8 @@ fun ByteArray.toInt(): Int {
 /**
  * Reflects an [Int] into its [ByteArray] representation
  *
- * @param size - size of the resulting array
- * @param byteOrder - endianness when putting it into the byte array
+ * @param size size of the resulting array
+ * @param byteOrder endianness when putting it into the byte array
  * @return [ByteArray] representation of the given [Int]
  */
 fun Int.toByteArray(
@@ -166,7 +171,7 @@ fun Array<Int>.toByteArray(): ByteArray =
 /**
  * Turns an [IntArray] of a single byte or more into a [ByteArray]
  *
- * @param size - number of bytes to be represented by each int
+ * @param size number of bytes to be represented by each int
  * @param byteOrder endianness of array to be generated
  * @return [ByteArray] representation of the given [IntArray]
  */
@@ -177,11 +182,17 @@ fun IntArray.toByteArray(
     return if (byteOrder == ByteOrder.LITTLE_ENDIAN) {
         this.foldRight(
             initial = ByteArray(0),
-            operation = { i: Int, acc: ByteArray -> acc + i.toByteArray(size = size) })
+            operation = { i: Int, acc: ByteArray ->
+                acc + i.toByteArray(size = size)
+            }
+        )
     } else {
         this.fold(
             initial = ByteArray(0),
-            operation = { acc: ByteArray, i: Int -> acc + i.toByteArray(size = size) })
+            operation = { acc: ByteArray, i: Int ->
+                acc + i.toByteArray(size = size)
+            }
+        )
     }
 }
 

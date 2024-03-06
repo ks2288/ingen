@@ -14,7 +14,8 @@ import java.io.File
 object ConfigBuilder {
 
     fun initializeFS() {
-        val pathSuccess = FSHelper.createPathDirectories(IngenConfig.INGEN_DEFAULT_DIR)
+        val pathSuccess =
+            FSHelper.createPathDirectories(IngenConfig.INGEN_DEFAULT_DIR)
         Logger.debug("System paths initialized: $pathSuccess")
     }
 
@@ -25,14 +26,14 @@ object ConfigBuilder {
         null
     }
     /**
-     * Takes a path of a subprocess command schema, and parses the file contents into a list
-     * of subprocess command objects
+     * Takes a path of a subprocess command schema, and parses the file contents
+     * into a list of subprocess command objects
      *
-     * @param schemaPath path to schema file from which the JSON text will be read
+     * @param schemaPath path to file from which the JSON text will be read
      * @return list of decoded subprocess objects
      */
     fun buildCommands(
-        schemaPath: String = CommandConstants.COMMAND_SCHEMA_PATH
+        schemaPath: String = CommandConstants.COMMAND_FILE_PATH
     ): List<Subprocess>? = try {
         FSHelper.getFileText(schemaPath)?.let {
             val list = parseCommands(it)
@@ -47,15 +48,19 @@ object ConfigBuilder {
     }
 
     /**
-     * Takes a path of a program path configuration JSON file, and reads/parses the text into a [IngenConfig] instance
+     * Takes a path of a program path configuration JSON file, and reads/parses
+     * the text into an [IngenConfig] instance
      *
      * @param configPath path to file located within module resource directory
      * @return decoded command config object
      */
-    fun buildConfig(configPath: String = CommandConstants.CONFIG_FILE_PATH): IngenConfig? = try {
+    fun buildConfig(
+        configPath: String = CommandConstants.CONFIG_FILE_PATH
+    ): IngenConfig? = try {
         FSHelper.getFileText(configPath)?.let { s ->
             SerializationHandler.serializableFromString(s)
-        } ?: SerializationHandler.serializableFromString(IngenDefaults.DEFAULT_CONFIG)
+        } ?: SerializationHandler
+            .serializableFromString(IngenDefaults.DEFAULT_CONFIG)
 
     } catch (e: Exception) {
         Logger.error(e)
@@ -63,18 +68,21 @@ object ConfigBuilder {
     }
 
     /**
-     * Compartmentalized method for handling the parsing of the schema file text into operable subprocess objects
+     * Compartmentalized method for handling the parsing of the schema file text
+     * into operable subprocess objects
      *
      * @param schemaString file content as a string
      * @return list of parsed subprocess objects
      */
     private fun parseCommands(schemaString: String): List<Subprocess>? = try {
-        val cmdArray = SerializationHandler.parseJsonArrayFromString(schemaString)
+        val cmdArray = SerializationHandler
+            .parseJsonArrayFromString(schemaString)
         with(arrayListOf<Subprocess>()) {
             cmdArray?.forEach {
-                SerializationHandler.serializableFromElement<Subprocess>(it)?.let { cmd ->
-                    add(cmd)
-                }
+                SerializationHandler
+                    .serializableFromElement<Subprocess>(it)?.let { cmd ->
+                        add(cmd)
+                    }
             }
             toList()
         }

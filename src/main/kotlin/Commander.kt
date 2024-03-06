@@ -49,33 +49,43 @@ class Commander {
             val pb = buildProcess(workingDir = wdp, args = args)
             val process = pb.start()
             val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val errorReader = BufferedReader(InputStreamReader(process.errorStream))
+            val errorReader =
+                BufferedReader(InputStreamReader(process.errorStream))
 
             reader.forEachLine {
                 Logger.debug("[CMDR] Subprocess output received: $it")
-                logBuilder.appendLine("${Calendar.getInstance().time}: $it")
+                logBuilder
+                    .appendLine("${Calendar.getInstance().time}: $it")
                 outputBuilder.appendLine(it)
             }
             errorReader.forEachLine {
                 Logger.debug("[CMDR] Subprocess error received: $it")
-                logBuilder.appendLine("${Calendar.getInstance().time}: $it")
+                logBuilder
+                    .appendLine("${Calendar.getInstance().time}: $it")
                 outputBuilder.appendLine(it)
             }
 
             val exitVal = process.waitFor()
             with("Subprocess exited with code: $exitVal") {
                 Logger.debug(this)
-                logBuilder.appendLine("\n${Calendar.getInstance().time}: $this")
+                logBuilder
+                    .appendLine("\n${Calendar.getInstance().time}: $this")
             }
         } catch (e: Exception) {
-            with("[CMDR] Subprocess exited with error: ${e.localizedMessage}") {
+            val s = "[CMDR] Subprocess exited with error: ${e.localizedMessage}"
+            val c = Calendar.getInstance().time
+            with(s) {
                 Logger.error(this)
-                logBuilder.appendLine("${Calendar.getInstance().time}: $this")
+                logBuilder.appendLine("${c}: $this")
                 outputBuilder.appendLine(this)
             }
 
         } finally {
-            logToFile(logBuilder.toString(), userArgs, wdp, executable.id.toString())
+            logToFile(
+                logBuilder.toString(),
+                userArgs, wdp,
+                executable.id.toString()
+            )
         }
         return outputBuilder.toString()
     }
@@ -90,7 +100,7 @@ class Commander {
      * framework (such as KTOR) that can guarantee scope preservation (i.e. not
      * Compose)
      *
-     * @param executable subprocess command object containing all necessary information
+     * @param executable subprocess command object
      * @param userArgs string array containing the process args
      * @return coroutine channel flow for monitoring subprocess output
      */
@@ -131,7 +141,8 @@ class Commander {
             }
 
         } catch (e: Exception) {
-            with("Subprocess exited with error: ${e.localizedMessage}") {
+            val s = "Subprocess exited with error: ${e.localizedMessage}"
+            with(s) {
                 println(this)
                 sb.appendLine("\n${Calendar.getInstance().time}: $this")
             }
@@ -143,9 +154,10 @@ class Commander {
     }.flowOn(Dispatchers.IO)
 
     /**
-     * Monitors asynchronous system program execution/output spawned with [ProcessBuilder] via coroutines
+     * Monitors asynchronous system program execution/output spawned with
+     * [ProcessBuilder] via coroutines
      *
-     * @param executable subprocess command object containing all necessary information
+     * @param executable subprocess command object
      * @param userArgs string array containing the process args
      * @param channel receiver for subsequent commands
      * @return channel flow of output fed to the route monitor
@@ -188,7 +200,8 @@ class Commander {
             }
             return@withContext
         } catch (e: Exception) {
-            with("Subprocess exited with error: ${e.localizedMessage}") {
+            val s = "Subprocess exited with error: ${e.localizedMessage}"
+            with(s) {
                 Logger.error(e)
                 sb.appendLine("\n${Calendar.getInstance().time}: $this")
             }
@@ -242,16 +255,13 @@ class Commander {
 
             val exitVal = process.waitFor()
             outputPublisher.onComplete()
-
-            with("Subprocess exited with code: $exitVal") {
-                Logger.debug(this)
-                sb.appendLine("\n${Calendar.getInstance().time}: $this")
-            }
+            val s = "Subprocess exited with code: $exitVal"
+            Logger.debug(s)
+            sb.appendLine("\n${Calendar.getInstance().time}: $s")
         } catch (e: Exception) {
-            with("Subprocess exited with error: ${e.localizedMessage}") {
-                Logger.error(this)
-                sb.appendLine("\n${Calendar.getInstance().time}: $this")
-            }
+            val s = "Subprocess exited with error: ${e.localizedMessage}"
+            Logger.error(s)
+            sb.appendLine("\n${Calendar.getInstance().time}: $s")
             outputPublisher.onError(e)
         } finally {
             logToFile(sb.toString(), userArgs, wdp, executable.id.toString())
@@ -263,7 +273,7 @@ class Commander {
      * Spawns an asynchronous, interactive subprocess that includes an input
      * publishing route for sending data to the subprocess during its runtime
      *
-     * @param executable subprocess command object containing all necessary information
+     * @param executable subprocess command object
      * @param userArgs command arguments
      * @param inputPublisher input route for subprocess STDIN
      * @param outputPublisher output route for subprocess STDOUT
@@ -304,31 +314,30 @@ class Commander {
 
             process.inputStream.bufferedReader().forEachLine { string ->
                 if (string.isNotBlank()) {
-                    println("[CMDR] CGI process output received: $string")
-                    sb.appendLine("${Calendar.getInstance().time}: $string")
+                    Logger.debug("[CMDR] CGI process output received: $string")
+                    val s = "${Calendar.getInstance().time}: $string"
+                    sb.appendLine(s)
                     outputPublisher.onNext(string)
                 }
             }
 
             process.errorStream.bufferedReader().forEachLine { string ->
-                println("[CMDR] CGI process error received: $string")
+                Logger.error("[CMDR] CGI process error received: $string")
                 sb.appendLine("${Calendar.getInstance().time}: $string")
                 outputPublisher.onNext(string)
             }
 
             val exitVal = process.waitFor()
 
-            with("Subprocess exited with code: $exitVal") {
-                Logger.debug(this)
-                sb.appendLine("\n${Calendar.getInstance().time}: $this")
-            }
+            val s = "Subprocess exited with code: $exitVal"
+            Logger.debug(s)
+            sb.appendLine("\n${Calendar.getInstance().time}: $s")
 
             outputPublisher.onComplete()
         } catch (e: Exception) {
-            with("Subprocess exited with error: ${e.localizedMessage}") {
-                Logger.error(this)
-                sb.appendLine("\n${Calendar.getInstance().time}: $this")
-            }
+            val s = "Subprocess exited with error: ${e.localizedMessage}"
+            Logger.error(s)
+            sb.appendLine("\n${Calendar.getInstance().time}: $s")
         } finally {
             logToFile(sb.toString(), userArgs, wdp, executable.id.toString())
             endSession(executable)
@@ -339,7 +348,7 @@ class Commander {
      * Spawns a watch service loop that can be used to continuously monitor a
      * given path on the host system for file changes
      *
-     * @param executable subprocess command object containing all necessary information
+     * @param executable subprocess command object
      * @param args full list of command arguments
      * @param watchDirectory directory to be watched for file changes
      * @param outputPublisher output route for subprocess STDOUT
@@ -382,7 +391,7 @@ class Commander {
      * each read; to use this functionality as a continuous service, use
      * [spawnWatcherCycle]
      *
-     * @param executable subprocess command object containing all necessary information
+     * @param executable subprocess command object
      * @param userArgs full list of command arguments
      * @param watchDirectory directory to be watched for file changes
      * @param outputPublisher output route for subprocess STDOUT
@@ -393,7 +402,7 @@ class Commander {
         watchDirectory: String,
         outputPublisher: BehaviorProcessor<String>,
     ) {
-        val outputBuilder = StringBuilder()
+        val logBuilder = StringBuilder()
         val args = buildArguments(executable, userArgs)
         val wdp = getWorkingDirectoryPath(executable)
         try {
@@ -432,7 +441,8 @@ class Commander {
                 f.deleteOnExit()
                 f.reader().forEachLine { str ->
                     println("[CMDR] Watch service output received: $str")
-                    outputBuilder.appendLine("${Calendar.getInstance().time}: $str")
+                    val out = "${Calendar.getInstance().time}: $str"
+                    logBuilder.appendLine(out)
                     s += str
                 }
             }
@@ -443,21 +453,19 @@ class Commander {
             val exitVal = process.waitFor()
             outputPublisher.onNext(s)
 
-            with("\nSubprocess exited with code: $exitVal") {
-                Logger.debug(this)
-                outputBuilder.appendLine(this)
-            }
-
+            val str = "\nSubprocess exited with code: $exitVal"
+            Logger.debug(str)
+            logBuilder.appendLine(str)
             outputPublisher.onComplete()
         } catch (e: Exception) {
-            with("Subprocess exited with error: ${e.localizedMessage}") {
-                println(this)
-                outputBuilder.appendLine("\n${Calendar.getInstance().time}: $this")
-            }
+            val s = "Subprocess exited with error: ${e.localizedMessage}"
+            val c = Calendar.getInstance().time
+            println(s)
+            logBuilder.appendLine("\n${c}: $s")
             outputPublisher.onError(e)
         } finally {
             logToFile(
-                outputBuilder.toString(),
+                logBuilder.toString(),
                 args,
                 wdp,
                 executable.id.toString()
@@ -467,12 +475,14 @@ class Commander {
     }
 
     /**
-     * Forcibly destroys any laggard processes; not intended for graceful termination
+     * Forcibly destroys any laggard processes; not intended for graceful
+     * termination, which should be handled by [endSession]
      */
     fun killAll() {
         sessions.forEach {
             it.process.destroyForcibly()
-            println("Subprocess destroyed forcibly with PID: ${it.process.pid()}")
+            val pid = it.process.pid()
+            Logger.debug("Subprocess destroyed forcibly with PID: $pid")
         }
         sessions.clear()
     }
@@ -485,7 +495,7 @@ class Commander {
      * Takes a path code and retrieves a command path from the config values
      *
      * @param code path code for the given command
-     * @return path of program to be executed, per the configuration values provided per program
+     * @return path of program to be executed per [IProgram.code]
      */
     private fun getCommandPath(code: Int): String =
         config?.paths?.values
@@ -494,11 +504,12 @@ class Commander {
             ?: throw RuntimeException("Cannot retrieve command path...")
 
     /**
-     * Gets the working directory [File] object of the given command by appending the nested directory path to the
-     * runtime directory's path string
+     * Gets the working directory [File] object of the given command by
+     * appending the nested directory path to the runtime directory's path
+     * string
      *
-     * @param ex subprocess command for which to determine the correct working directory
-     * @return runtime path of given program
+     * @param ex subprocess command used to compound a working directory
+     * @return runtime execution path needed by a given subprocess
      */
     private fun getWorkingDirectoryPath(ex: ISubprocess) : String {
         config?.let {
@@ -526,7 +537,9 @@ class Commander {
             val pid = ended.process.pid()
             ended.process.destroy()
             sessions.remove(ended)
-            Logger.debug("Subprocess terminated\n\tID: $pid\n\tTAG: ${ex.command.tag}\n")
+            val s =
+                "Subprocess terminated\n\tID: $pid\n\tTAG: ${ex.command.tag}\n"
+            Logger.debug(s)
         } catch (e: Exception) { Logger.error(e) }
     }
 
@@ -534,7 +547,7 @@ class Commander {
      * Modular function for building a process for all types of sessions
      *
      * @param workingDir working directory from which to spawn the process
-     * @param args full set of built arguments, combining runtime and command directory paths
+     * @param args full set of built arguments, including needed paths
      * @param redirectInput process input (STDIO) redirection flag
      * @param redirectOutput process output (STDIO) redirection flag
      * @param redirectError process error (STDERR) redirection flag
@@ -560,13 +573,14 @@ class Commander {
     }
 
     /**
-     * Builds an arguments list to be passed to the active [ProcessBuilder], including both the program path
-     * (i.e. /bin/echo), any corresponding alias values (a python script file name, for example) and any user-supplied
-     * arguments
+     * Builds an arguments list to be passed to the active [ProcessBuilder],
+     * including both the program path (i.e. /bin/echo), any corresponding
+     * alias values (a python script file name, for example) and any
+     * user-supplied arguments
      *
      * @param ex subprocess command to build arguments from
      * @param userArgs any user-supplied arguments to accompany the command
-     * @return list of argument strings to be passed to the native [ProcessBuilder.command] property
+     * @return list of argument strings passed to the native [ProcessBuilder]
      */
     private fun buildArguments(
         ex: ISubprocess,
@@ -588,7 +602,7 @@ class Commander {
      * @param args argument list for adding logging details
      * @param directory directory for log file to be written
      */
-    // TODO: move this to the still-needed logger class implementation
+    // TODO: move to using Logger object method
     private fun logToFile(
         text: String,
         args: List<String>,

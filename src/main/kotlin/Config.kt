@@ -15,7 +15,8 @@ interface IProgram {
 }
 
 /**
- * Concrete class for all program definitions produced through JSON config file serialization
+ * Concrete class for all program definitions produced through JSON config file
+ * serialization/decoding
  */
 @Serializable
 data class Program(
@@ -26,7 +27,8 @@ data class Program(
 ) : IProgram
 
 /**
- * Concrete class for master command configuration instances, produced through JSON config file serialization
+ * Concrete class for master command configuration instances, produced through
+ * JSON config file serialization
  */
 @Serializable
 data class IngenConfig(
@@ -38,7 +40,8 @@ data class IngenConfig(
     val environmentVariables: Map<String, String> = mapOf()
 ) {
     /**
-     * Produces a list of command names for easier designation throughout the rest of the JRE app
+     * Produces a list of command names for easier designation throughout the
+     * rest of the JRE app
      */
     fun getCommandNames() = with(arrayListOf<String>()) {
         paths.entries.forEach { add(it.key) }
@@ -46,7 +49,6 @@ data class IngenConfig(
     }
 
     companion object {
-        // TODO: remove this in favor of the constants object
         val INGEN_DEFAULT_DIR = System.getProperty("user.home") + "/.ingen"
     }
 }

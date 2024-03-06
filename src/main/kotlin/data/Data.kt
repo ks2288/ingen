@@ -16,8 +16,8 @@ enum class PacketType {
 }
 
 /**
- * Class for housing an individual data transaction's-worth of information, expected to be sent to a receiver in
- * multi-segment fashion
+ * Class for housing an individual data transaction's-worth of information,
+ * supporting multipart packet exchange
  */
 class IOData(
     private val processId: String,
@@ -49,7 +49,8 @@ class IOData(
         }
     }
     /**
-     * Takes a uByte array, and generates CRCs per a given slice count, formulated per a provided size
+     * Takes a uByte array, and generates CRCs per a given slice count,
+     * returned with a provided size
      *
      * @param data full block of uByte data to slice and CRC
      * @param sliceSize maximum size of each slice, each of which become packet payloads
@@ -65,7 +66,8 @@ class IOData(
             val count = ceil(data.size.toFloat() / sliceSize).toInt()
             for (i in 0 until count) {
                 val start = sliceSize * i
-                val size = sliceSize.takeIf { sliceSize <= remaining } ?: remaining
+                val size = sliceSize.takeIf { sliceSize <= remaining }
+                    ?: remaining
                 remaining -= sliceSize
                 // offset slice size by -1 for end-inclusive int range
                 val end = start + size - 1

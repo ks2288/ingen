@@ -6,6 +6,13 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
 
+/**
+ * Helper extension for quickly turning formatted strings into [LocalDateTime]
+ * instances
+ *
+ * @param formatString format provided to [SimpleDateFormat] as a string
+ * @return reflected [LocalDateTime], or null on failure
+ */
 fun String.toLocalDateTime(formatString: String): LocalDateTime? = try {
     LocalDateTime.parse(
         this,
@@ -17,6 +24,12 @@ fun String.toLocalDateTime(formatString: String): LocalDateTime? = try {
     null
 }
 
+/**
+ * Helper extension for quickly turning formatted strings into [Date] instances
+ *
+ * @param formatString format provided to [SimpleDateFormat] as a string
+ * @return reflected [Date], or null on failure
+ */
 fun String.toJavaDate(formatString: String): Date? = try {
     SimpleDateFormat(formatString, Locale.getDefault())
         .parse(this)

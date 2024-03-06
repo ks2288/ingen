@@ -81,5 +81,3 @@ enum class SignalRoute {
 
     abstract val routeCode: Int
 }
-
-

@@ -6,7 +6,8 @@ import util.ext.shl
 import util.ext.shr
 
 /**
- * Simple utility object for working with CRC16 hash values during data operations requiring integrity checks
+ * Simple utility object for working with CRC16 hash values during data
+ * operations requiring integrity checks
  */
 object CRC16Utils {
     /**
@@ -28,7 +29,10 @@ object CRC16Utils {
      * @param polynomial 2-byte polynomial for CRC-16 calculation
      * @return unsigned 2-byte CRC-16 value
      */
-    fun crc16(uByte: UByte, polynomial: UShort = CRC16_POLY_HEX.toUShort()): UShort {
+    fun crc16(
+        uByte: UByte,
+        polynomial: UShort = CRC16_POLY_HEX.toUShort()
+    ): UShort {
         val bigEndian = uByte.toUShort() shl 8
         return (0 until 8).fold(bigEndian) { result, _ ->
             val isLittleEndian =
@@ -68,7 +72,7 @@ object CRC16Utils {
      * Calculates a CRC-16 from a UByte array input, given a known initial value
      *
      * @param uBytes full UByte array of the input data
-     * @param initial known initial value when compounding CRC values from slices of a byte array
+     * @param initial known initial value when compounding CRC values per slice
      * @return unsigned 2-byte CRC-16 value
      */
     fun crc16(uBytes: UByteArray, initial: UShort = 0.toUShort()): UShort {
@@ -83,7 +87,7 @@ object CRC16Utils {
      * Calculates a CRC-16 from a byte array input, given a known initial value
      *
      * @param bytes full byte array of the input data
-     * @param initial known initial value when compounding CRC values from slices of a byte array
+     * @param initial known initial value when compounding CRC values per slice
      * @return unsigned 2-byte CRC-16 value
      */
     fun crc16(bytes: ByteArray, initial: Short = 0): UShort =

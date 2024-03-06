@@ -63,9 +63,12 @@ class IODataTest {
         // 128 ubyte payload data
         private val TEST_PAYLOAD: UByteArray
             get() {
-                val reversedData = TestConstants.TEST_PACKET_DATA.reversed().toUByteArray()
+                val reversedData = TestConstants.TEST_PACKET_DATA
+                    .reversed()
+                    .toUByteArray()
                 return with(arrayListOf<UByte>()) {
-                    // add one from the reversed copy, and one from the original back-to-back for arbitrary variance
+                    // add one from the reversed copy, and one from the original
+                    // back-to-back for arbitrary variance
                     reversedData.forEachIndexed { i, b ->
                         add(b)
                         add(TestConstants.TEST_PACKET_DATA[i])

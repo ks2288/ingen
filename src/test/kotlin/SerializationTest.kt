@@ -2,10 +2,10 @@ import command.ISubprocess
 import command.Subprocess
 import kotlinx.serialization.json.*
 import message.SerializationHandler
-import net.il.util.SysConstants
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import util.TestConstants
 import java.io.File
 
 class SerializationTest {
@@ -24,17 +24,20 @@ class SerializationTest {
         jsonArrayString = File(JSON_ARRAY_FILE_PATH).readText()
         jsonObjString = File(JSON_OBJ_FILE_PATH).readText()
         cmdArrayString = File(CMD_ARRAY_FILE_PATH).readText()
-        testArray1 = SerializationHandler.parseJsonArrayFromString(jsonArrayString)
-        testArray2 = SerializationHandler.parseJsonArrayFromString(cmdArrayString)
+        testArray1 = SerializationHandler
+            .parseJsonArrayFromString(jsonArrayString)
+        testArray2 = SerializationHandler
+            .parseJsonArrayFromString(cmdArrayString)
         testArray1?.let {
             testElement = it.first()
             testObject = testElement?.jsonObject
         }
         testElement?.jsonObject?.values?.let { objectList.addAll(it) }
         testArray2?.forEach { e ->
-            SerializationHandler.serializableFromElement<Subprocess>(e)?.let { c ->
-                execList.add(c)
-            }
+            SerializationHandler
+                .serializableFromElement<Subprocess>(e)?.let { c ->
+                    execList.add(c)
+                }
         }
     }
 
@@ -45,7 +48,9 @@ class SerializationTest {
     fun test_parse_array() { assert(testArray1?.size == 2) }
 
     @Test
-    fun test_parse_element() { assert(testElement?.jsonObject?.size == EXPECTED_OBJECT_SIZE) }
+    fun test_parse_element() {
+        assert(testElement?.jsonObject?.size == EXPECTED_OBJECT_SIZE)
+    }
 
     @Test
     fun test_parse_keys() {
@@ -77,17 +82,21 @@ class SerializationTest {
     }
 
     @Test
-    fun test_parse_executable() { assert(execList.size == EXPECTED_CMD_LIST_SIZE) }
+    fun test_parse_executable() {
+        assert(execList.size == EXPECTED_CMD_LIST_SIZE)
+    }
 
     companion object {
-        private val TEST_RES_DIR = "${SysConstants.PROJECT_ROOT}/src/test/resources"
         private const val TEST_ARRAY_FILE_NAME = "test_array.json"
         private const val CMD_ARRAY_FILE_NAME = "test_cmd.json"
         private const val JSON_OBJECT_FILE_NAME = "test_obj.json"
         private const val EXPECTED_CMD_LIST_SIZE = 8
-        private val JSON_ARRAY_FILE_PATH = "$TEST_RES_DIR/$TEST_ARRAY_FILE_NAME"
-        private val CMD_ARRAY_FILE_PATH = "$TEST_RES_DIR/$CMD_ARRAY_FILE_NAME"
-        private val JSON_OBJ_FILE_PATH = "$TEST_RES_DIR/$JSON_OBJECT_FILE_NAME"
+        private val JSON_ARRAY_FILE_PATH =
+            "${TestConstants.TEST_RES_DIR}/$TEST_ARRAY_FILE_NAME"
+        private val CMD_ARRAY_FILE_PATH =
+            "${TestConstants.TEST_RES_DIR}/$CMD_ARRAY_FILE_NAME"
+        private val JSON_OBJ_FILE_PATH =
+            "${TestConstants.TEST_RES_DIR}/$JSON_OBJECT_FILE_NAME"
         private const val EXPECTED_OBJECT_SIZE = 3
         private const val STRING_KEY = "stringKey"
         private const val INT_KEY = "intKey"

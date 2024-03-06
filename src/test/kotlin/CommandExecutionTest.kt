@@ -9,7 +9,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import message.SerializationHandler
 import net.il.Commander
-import net.il.util.SysConstants
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -34,9 +33,11 @@ class CommandExecutionTest {
         outputPublisher = BehaviorProcessor.create()
         inputPublisher = BehaviorProcessor.create()
         jsonArrayString = File(JSON_ARRAY_FILE_PATH).readText()
-        testArray = SerializationHandler.parseJsonArrayFromString(jsonArrayString)
+        testArray =
+            SerializationHandler.parseJsonArrayFromString(jsonArrayString)
         testArray?.forEach {
-            val decoded = SerializationHandler.serializableFromElement<Subprocess>(it)
+            val decoded =
+                SerializationHandler.serializableFromElement<Subprocess>(it)
 
             decoded?.let { sp -> execList.add(sp) }
         }
@@ -134,9 +135,9 @@ class CommandExecutionTest {
     }
 
     companion object {
-        private val TEST_RES_DIR = "${SysConstants.PROJECT_ROOT}/src/test/resources"
         private const val JSON_ARRAY_FILE_NAME = "test_cmd.json"
-        private val JSON_ARRAY_FILE_PATH = "$TEST_RES_DIR/$JSON_ARRAY_FILE_NAME"
+        private val JSON_ARRAY_FILE_PATH =
+            "${TestConstants.TEST_RES_DIR}/$JSON_ARRAY_FILE_NAME"
         private const val ECHO_CONTENT = "test echo"
         private const val EXPECTED_MONITOR_OUTPUT_SIZE = 10
         private const val EXPECTED_COROUTINES_RESULTS_SIZE = 5

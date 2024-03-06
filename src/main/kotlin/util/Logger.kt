@@ -4,11 +4,8 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.util.*
 
-// TODO: fill in methods with actual logging logic (or switch to something like Timber)
+// TODO: fill this out or switch to something like Timber
 object Logger {
-    private val USER_HOME = System.getProperty("user.home")
-    private const val LOG_DIRECTORY = ".fusion_log/"
-    val LOG_PATH = "$USER_HOME/$LOG_DIRECTORY"
 
     fun debug(message: String) {
         println(message)
@@ -42,7 +39,6 @@ object Logger {
         println(e.localizedMessage)
     }
 
-    // TODO: change this parameter from the args list to some kind of descriptive title
     /**
      * Creates a log file name per executed command and returns a path string
      *
@@ -63,7 +59,12 @@ object Logger {
      * @param args argument list for adding logging details
      * @param directory directory for log file to be written
      */
-    private fun toFile(text: String, args: List<String>, directory: String) {
+    private fun toFile(
+        text: String,
+        args: List<String>,
+        directory: String,
+        savePath: String
+    ) {
         val sb = StringBuilder()
         sb.appendLine("""
             Begin log for subprocess:
@@ -79,7 +80,7 @@ object Logger {
         text.lines().forEach { sb.appendLine(it) }
         try {
             val file = File(
-                LOG_PATH,
+                savePath,
                 createLogFileName(args = args)
             )
             file.bufferedWriter().use { out ->

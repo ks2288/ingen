@@ -1,22 +1,18 @@
 package command
 
-import command.ProcessType.ASYNC
-import command.ProcessType.POLL
+import command.ProcessType.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Contract for all commands harvested and decoded from JSON spec files; as a note:
- * it would be just as appropriate for an abstract class to be the starting point for
- * this contract - just as it would be for all other interfaces within this app code;
- * however, the point is to perpetuate common code while writing the least lines
- * possible - which both strategies satisfy; i.e. if that change were to be made here,
- * none of the subclasses - nor their tests - would need to be edited as a result
+ * Contract for all commands harvested and decoded from JSON spec files
  *
- * @property pathCode program's path within the system, i.e., `/bin/echo`
+ * @property tag description of referenced program
  * @property directory working directory for command
  * @property programAlias name of helper/script files, i.e., `runner.py`
- * @property typeCode ordinal value of type enum for distinguishing poll or async
+ * @property escapeSequence key sequence for signaling process termination
+ * @property pathCode ordinal path code of referenced program
+ * @property typeCode ordinal type code of referenced program
  */
 interface ICommand {
     val tag: String
@@ -28,10 +24,10 @@ interface ICommand {
 }
 
 /**
- * Simple contract for cataloging information about a subprocess session (runtime)
+ * Simple contract for cataloging subprocesses during runtime
  *
  * @property process native process object
- * @property sequenceNumber mutable property for tracking the sequence of data communications
+ * @property sequenceNumber value for auditing the sequence of process events
  */
 interface ISession {
     val process: Process
@@ -40,8 +36,9 @@ interface ISession {
 }
 
 /**
- * Executable subprocess object schema, containing both the specific subprocess command
- * and the necessary logistical information for process management purposes
+ * Executable subprocess object schema, containing both the specific subprocess
+ * command and the necessary logistical information for process management
+ * purposes
  *
  * @property id unique subprocess ID for runtime logistics
  * @property command nested command object
@@ -70,12 +67,14 @@ interface ISubprocess {
  * Simple process type designation for executing subprocesses
  *
  * @property POLL simple "fire-and-forget" command that returns a single result
- * @property ASYNC asynchronous process that continuously runs in the background
+ * @property ASYNC async subprocess that accepts no user input
+ * @property INTERACTIVE async subprocess that accepts user input
  */
 // TODO: create an annotation for all reflector classes etc that have a backing JSON config
 enum class ProcessType {
     POLL,
-    ASYNC
+    ASYNC,
+    INTERACTIVE
 }
 
 /**
@@ -100,7 +99,8 @@ data class Command(
 }
 
 /**
- * Contains all information needed to spawn and monitor a subprocess from within a Viper instance
+ * Contains all information needed to spawn and monitor a subprocess from within
+ * an Ingen instance
  */
 @Serializable
 data class Subprocess(
@@ -118,4 +118,3 @@ class Session(
 ) : ISession {
     override var sequenceNumber: Int = 0
 }
-

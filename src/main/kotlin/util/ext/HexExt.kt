@@ -11,6 +11,7 @@ infix fun UShort.shl(shiftCount: Int): UShort =
 
 /**
  * Performs a right-hand shift to the 2 bytes within a UShort
+ *
  * @param shiftCount number of bits to shift right
  * @return the two unsigned bytes, shifted right
  */
