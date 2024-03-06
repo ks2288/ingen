@@ -8,11 +8,11 @@ import util.CRC16Utils
 import kotlin.math.ceil
 
 enum class PacketType {
-    TRANSMIT_BEGIN,
-    TRANSMIT_END,
+    MP_INIT,
+    MP_TERM,
     ACK,
-    ERROR,
-    DATA
+    ERR,
+    DATA,
 }
 
 /**
