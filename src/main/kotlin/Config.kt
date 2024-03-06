@@ -46,6 +46,7 @@ data class IngenConfig(
     }
 
     companion object {
+        // TODO: remove this in favor of the constants object
         val INGEN_DEFAULT_DIR = System.getProperty("user.home") + "/.ingen"
     }
 }
