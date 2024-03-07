@@ -2,104 +2,46 @@
 
 package data
 
-import data.IOPacket.Companion.PAYLOAD_MAX_SIZE
-import org.jetbrains.annotations.VisibleForTesting
-import util.CRC16Utils
-import kotlin.math.ceil
-
-enum class PacketType {
-    MP_INIT,
-    MP_TERM,
-    ACK,
-    ERR,
-    DATA,
-}
+import net.il.data.StandardizedProtocol
+import net.il.util.ext.toUByteArray
 
 /**
- * Class for housing an individual data transaction's-worth of information,
- * supporting multipart packet exchange
+ * Concrete implementation of [StandardizedProtocol] for all packets being
+ * sent to and from an Ingen instance and a sand-boxed subprocess
  */
-class IOData(
-    private val processId: String,
-    private val byteData: UByteArray
-) {
-    /**
-     *
-     */
-    fun buildPackets(
-        data: UByteArray = byteData,
-        sliceSize: Int = PAYLOAD_MAX_SIZE
-    ): List<IOPacket> {
-        return with(arrayListOf<IOPacket>()) {
-            val sliced = sliceData(
-                data = data,
-                sliceSize = sliceSize
-            )
-            sliced.forEachIndexed { i, p ->
-                add(
-                    IOPacket(
-                        processId = processId,
-                        crc = p.second,
-                        index = i + 1,
-                        payload = p.first
-                    )
-                )
-            }
-            this
-        }
-    }
-    /**
-     * Takes a uByte array, and generates CRCs per a given slice count,
-     * returned with a provided size
-     *
-     * @param data full block of uByte data to slice and CRC
-     * @param sliceSize maximum size of each slice, each of which become packet payloads
-     * @return list containing pairs of data slices and their corresponding CRC16 values
-     */
-    @VisibleForTesting
-    fun sliceData(
-        data: UByteArray = byteData,
-        sliceSize: Int = PAYLOAD_MAX_SIZE
-    ): List<Pair<UByteArray, UShort>> {
-        return with(arrayListOf<Pair<UByteArray, UShort>>()) {
-            var remaining = data.size
-            val count = ceil(data.size.toFloat() / sliceSize).toInt()
-            for (i in 0 until count) {
-                val start = sliceSize * i
-                val size = sliceSize.takeIf { sliceSize <= remaining }
-                    ?: remaining
-                remaining -= sliceSize
-                // offset slice size by -1 for end-inclusive int range
-                val end = start + size - 1
-                val slice = data.slice(IntRange(start, end))
-                val crc = CRC16Utils.crc16(uBytes = slice.toUByteArray())
-                add(i, Pair(slice.toUByteArray(), crc))
-            }
-            this
-        }
-    }
-}
-
 data class IOPacket(
-    val processId: String,
-    val crc: UShort,
-    val index: Int,
-    val payload: UByteArray
-) {
-    fun toUBytes(): UByteArray {
-        TODO()
+    override val processId: Int,
+    override val crc: Int,
+    override val type: Int,
+    override val index: Int,
+    override val parts: Int,
+    override val payload: UByteArray
+) : StandardizedProtocol {
+    /**
+     * Concrete implementation of [StandardizedProtocol.toUBytes]
+     */
+    override fun toUBytes(): UByteArray = with(arrayListOf<UByte>()) {
+        addAll(processId.toUByteArray(size = PID_SIZE))
+        addAll(crc.toUByteArray(size = CRC_SIZE))
+        addAll(type.toUByteArray(size = PACKET_TYPE_SIZE))
+        addAll(index.toUByteArray(size = INDEX_SIZE))
+        addAll(parts.toUByteArray(size = PARTS_SIZE))
+        addAll(payload)
+        this.toUByteArray()
     }
 
     companion object {
-        const val PROC_ID_OFFSET = 0
-        const val PROC_ID_SIZE = 2
+        const val PID_OFFSET = 0
+        const val PID_SIZE = 2
         const val CRC_OFFSET = 2
         const val CRC_SIZE = 2
-        const val SEQUENCE_NO_OFFSET = 4
-        const val SEQUENCE_NO_SIZE = 2
-        const val PACKET_TYPE_OFFSET = 6
-        const val PACKET_TYPE_SIZE = 1
-        const val PAYLOAD_OFFSET = 7
+        const val PACKET_TYPE_OFFSET = 4
+        const val PACKET_TYPE_SIZE = 2
+        const val INDEX_OFFSET = 6
+        const val INDEX_SIZE = 3
+        const val PARTS_OFFSET = 9
+        const val PARTS_SIZE = 3
+        const val PAYLOAD_OFFSET = 12
         const val PAYLOAD_MAX_SIZE = 64
     }
 }

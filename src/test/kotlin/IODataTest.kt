@@ -1,12 +1,10 @@
 @file:OptIn(ExperimentalUnsignedTypes::class)
 
-import data.IOData
+import net.il.data.IOProcessor
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import util.TestConstants
-import java.util.*
-import kotlin.test.assertEquals
 
 class IODataTest {
     @Before
@@ -17,49 +15,46 @@ class IODataTest {
 
     @Test
     fun testSliceData() {
-        val sliced = TEST_IO_DATA.sliceData()
-        val expected = TEST_IO_DATA.sliceData(data = TEST_PAYLOAD)
-        sliced.forEachIndexed { i, p ->
-            assert(p.second == expected[i].second)
-        }
+        val expected = IOProcessor.sliceData(data = TEST_PAYLOAD)
+        assert(expected.size == 2 && expected.first().first.size == 64)
     }
 
     @Test
     fun testSliceSizeVariance() {
-        val sliced = TEST_IO_DATA.sliceData(sliceSize = TEST_SLICE_SIZE)
-        val expected = TEST_IO_DATA.sliceData(
+        val expected = IOProcessor.sliceData(
             data = TEST_PAYLOAD,
             sliceSize = TEST_SLICE_SIZE
         )
-        sliced.forEachIndexed { i, p ->
-            assert(p.second == expected[i].second)
+        assert(expected.size == 16)
+    }
+
+    @Test
+    fun testBuildMultipart() {
+        val packets = IOProcessor.buildPackets(
+            processId = 0,
+            data = TEST_PAYLOAD
+        )
+        assert(packets.size == EXPECTED_MP_MESSAGE_SIZE)
+        packets.forEachIndexed { i, p ->
+            assert(p.index == i + 1 && p.parts == packets.size)
         }
     }
 
     @Test
-    fun testBuildPackets() {
-        val packets = TEST_IO_DATA.buildPackets()
-        val expected = TEST_IO_DATA.buildPackets(data = TEST_PAYLOAD)
+    fun testBuildSinglePart() {
+        val packets = IOProcessor.buildPackets(
+            processId = 1,
+            data = TestConstants.TEST_PACKET_DATA
+        )
+        assert(packets.size == 1)
         packets.forEachIndexed { i, p ->
-            assertEquals(
-                listOf(
-                    p.processId,
-                    p.crc.toInt(),
-                    p.payload.size,
-                    p.index
-                ),
-                listOf(
-                    expected[i].processId,
-                    expected[i].crc.toInt(),
-                    expected[i].payload.size,
-                    expected[i].index
-                )
-            )
+            assert(p.index == i + 1 && p.parts == packets.size)
         }
     }
 
     companion object {
-        const val TEST_SLICE_SIZE = 8
+        private const val TEST_SLICE_SIZE = 8
+        private const val EXPECTED_MP_MESSAGE_SIZE = 2
         // 128 ubyte payload data
         private val TEST_PAYLOAD: UByteArray
             get() {
@@ -76,11 +71,5 @@ class IODataTest {
                     this.toUByteArray()
                 }
             }
-
-        // test IOData with a 128 uByte payload
-        private val TEST_IO_DATA: IOData = IOData(
-            processId = UUID.randomUUID().toString(),
-            byteData = TEST_PAYLOAD
-        )
     }
 }

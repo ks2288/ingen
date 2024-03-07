@@ -151,8 +151,23 @@ fun Int.toByteArray(
     } else {
         byteArray.copyOfRange(fromIndex = 4 - size, toIndex = 4)
     }
-
 }
+
+/**
+ * Takes the result of [Int.toByteArray] and returns its [UByteArray] equivalent
+ *
+ * @param size size of array to be returned
+ * @param byteOrder endianness of returned array
+ * @return [UByteArray] representation of the given integer
+ */
+@OptIn(ExperimentalUnsignedTypes::class)
+fun Int.toUByteArray(
+    size: Int = 4,
+    byteOrder: ByteOrder = ByteOrder.LITTLE_ENDIAN
+) = this.toByteArray(
+    size = size,
+    byteOrder = byteOrder
+).toUByteArray()
 
 //endregion
 
