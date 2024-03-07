@@ -12,17 +12,32 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.flowOn
-import net.il.util.CommandConstants
 import net.il.util.Logger
 import java.io.*
 import java.nio.file.FileSystems
 import java.nio.file.StandardWatchEventKinds
 import java.util.*
+import kotlin.coroutines.CoroutineContext
 
+/**
+ * (God-like) Class for handling all sand-boxed subprocesses via the JDK's
+ * [ProcessBuilder], with support for both Rx-based behavioral and
+ * Coroutine-based asynchronous result routing; since [ProcessBuilder]
+ * handles the waiting for a process termination signal in a semaphore-based
+ * manner, most of these methods incorporate procedurally-oriented
+ * sequencing; however, a more-thorough control of this class's execution
+ * context is possible within the JRE by using manual threading to wrap
+ * method calls; this way, frameworks that do not handle threading gracefully
+ * (Java AWT and Swing, for example) can still handle these async operations
+ * without freezing their main/UI thread while awaiting results
+ *
+ * @property config configuration instance based on provided config file values
+ * @property sessions list of all subprocess sessions for housekeeping
+ */
 class Commander {
+
     //region Properties
 
-    private val commands = ConfigBuilder.buildCommands()
     private val config = ConfigBuilder.buildConfig()
     private val sessions = arrayListOf<Session>()
 
@@ -81,10 +96,13 @@ class Commander {
             }
 
         } finally {
-            logToFile(
+            val name = getProgramName(executable)
+            Logger.logToFile(
                 logBuilder.toString(),
-                userArgs, wdp,
-                executable.id.toString()
+                userArgs,
+                wdp,
+                executable.id.toString(),
+                name
             )
         }
         return outputBuilder.toString()
@@ -102,71 +120,14 @@ class Commander {
      *
      * @param executable subprocess command object
      * @param userArgs string array containing the process args
+     * @param flowContext coroutine context to receive channel flow on
      * @return coroutine channel flow for monitoring subprocess output
      */
     fun executeChannelFlow(
         executable: ISubprocess,
         userArgs: List<String>,
+        flowContext: CoroutineContext = Dispatchers.IO
     ) = channelFlow {
-        val sb = StringBuilder()
-        val wdp = getWorkingDirectoryPath(executable)
-        val args = buildArguments(executable, userArgs)
-        try {
-            val pb = buildProcess(
-                workingDir = wdp,
-                args = args,
-                redirectInput = true,
-                redirectError = true
-            )
-
-            val process = pb.start()
-            sessions.add(Session(process, executable.id))
-
-            process.inputStream.bufferedReader().forEachLine { string ->
-                println("[CMDR] CGI process output received: $string")
-                sb.appendLine("${Calendar.getInstance().time}: $string")
-                launch { channel.trySend(string) }
-            }
-
-            process.errorStream.bufferedReader().forEachLine { string ->
-                println("[CMDR] CGI process error received: $string")
-                sb.appendLine("${Calendar.getInstance().time}: $string")
-                launch { channel.trySend(string) }
-            }
-
-            val exitVal = process.waitFor()
-            with("Subprocess exited with code: $exitVal") {
-                println(this)
-                sb.appendLine("\n${Calendar.getInstance().time}: $this")
-            }
-
-        } catch (e: Exception) {
-            val s = "Subprocess exited with error: ${e.localizedMessage}"
-            with(s) {
-                println(this)
-                sb.appendLine("\n${Calendar.getInstance().time}: $this")
-            }
-        } finally {
-            logToFile(sb.toString(), userArgs, wdp, executable.id.toString())
-            endSession(executable)
-            close()
-        }
-    }.flowOn(Dispatchers.IO)
-
-    /**
-     * Monitors asynchronous system program execution/output spawned with
-     * [ProcessBuilder] via coroutines
-     *
-     * @param executable subprocess command object
-     * @param userArgs string array containing the process args
-     * @param channel receiver for subsequent commands
-     * @return channel flow of output fed to the route monitor
-     */
-    suspend fun collectAsync(
-        executable: ISubprocess,
-        userArgs: List<String>,
-        channel: SendChannel<String>,
-    ) = withContext(Dispatchers.IO) {
         val sb = StringBuilder()
         val wdp = getWorkingDirectoryPath(executable)
         val args = buildArguments(executable, userArgs)
@@ -184,29 +145,100 @@ class Commander {
             process.inputStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] CGI process output received: $string")
                 sb.appendLine("${Calendar.getInstance().time}: $string")
+                launch { channel.trySend(string) }
+            }
+
+            process.errorStream.bufferedReader().forEachLine { string ->
+                Logger.error("[CMDR] CGI process error received: $string")
+                sb.appendLine("${Calendar.getInstance().time}: $string")
+                launch { channel.trySend(string) }
+            }
+
+            val exitVal = process.waitFor()
+            val s = "Subprocess exited with code: $exitVal"
+            Logger.debug(s)
+            sb.appendLine("\n${Calendar.getInstance().time}: $s")
+        } catch (e: Exception) {
+            val s = "Subprocess exited with error: ${e.localizedMessage}"
+            Logger.error(s)
+            sb.appendLine("\n${Calendar.getInstance().time}: $s")
+        } finally {
+            Logger.logToFile(
+                sb.toString(),
+                userArgs,
+                wdp,
+                executable.id.toString()
+            )
+            endSession(executable)
+            close()
+        }
+    }.flowOn(flowContext)
+
+    /**
+     * Collects the results of a single subprocess asynchronously and returns
+     * a cold flow, depending on the receiver context and thread of execution;
+     * for receiving the output of a subprocess as a purely hot flow, use
+     * [executeRx]
+     *
+     * @param executable subprocess command object
+     * @param userArgs string array containing the process args
+     * @param channel receiver for subsequent commands
+     * @param operationContext coroutine context of subprocess execution
+     * @return channel flow of output fed to the route monitor
+     */
+    suspend fun collectAsync(
+        executable: ISubprocess,
+        userArgs: List<String>,
+        channel: SendChannel<String>,
+        operationContext: CoroutineContext = Dispatchers.IO
+    ) = withContext(operationContext) {
+        val logBuilder = StringBuilder()
+        val wdp = getWorkingDirectoryPath(executable)
+        val args = buildArguments(executable, userArgs)
+        try {
+            val pb = buildProcess(
+                workingDir = wdp,
+                args = args,
+                redirectInput = true,
+                redirectError = true
+            )
+
+            val process = pb.start()
+            sessions.add(Session(process, executable.id))
+
+            process.inputStream.bufferedReader().forEachLine { string ->
+                Logger.debug("[CMDR] CGI process output received: $string")
+                val s = "${Calendar.getInstance().time}: $string"
+                logBuilder.appendLine(s)
                 launch { channel.send(string) }
             }
 
             process.errorStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] CGI process error received: $string")
-                sb.appendLine("${Calendar.getInstance().time}: $string")
+                val s = "${Calendar.getInstance().time}: $string"
+                logBuilder.appendLine(s)
                 launch { channel.send(string) }
             }
 
             val exitVal = process.waitFor()
-            with("Subprocess exited with code: $exitVal") {
-                Logger.debug(this)
-                sb.appendLine("\n${Calendar.getInstance().time}: $this")
-            }
+            val s = "Subprocess exited with code: $exitVal"
+            Logger.debug(s)
+            logBuilder.appendLine("\n${Calendar.getInstance().time}: $s")
             return@withContext
         } catch (e: Exception) {
             val s = "Subprocess exited with error: ${e.localizedMessage}"
-            with(s) {
-                Logger.error(e)
-                sb.appendLine("\n${Calendar.getInstance().time}: $this")
-            }
+            Logger.error(e)
+            val c = "\n${Calendar.getInstance().time}: $s"
+            logBuilder.appendLine(c)
         } finally {
-            logToFile(sb.toString(), args, wdp, executable.id.toString())
+            val name = getProgramName(executable)
+            Logger.logToFile(
+                logBuilder.toString(),
+                userArgs,
+                wdp,
+                executable.id.toString(),
+                name
+            )
             endSession(executable)
             channel.close()
             endSession(executable)
@@ -227,7 +259,7 @@ class Commander {
         userArgs: List<String>,
         outputPublisher: BehaviorProcessor<String>,
     ) {
-        val sb = StringBuilder()
+        val lb = StringBuilder()
         val args = buildArguments(executable, userArgs)
         val wdp = getWorkingDirectoryPath(executable)
         try {
@@ -243,13 +275,13 @@ class Commander {
 
             process.inputStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] Subprocess output received: $string")
-                sb.appendLine("${Calendar.getInstance().time}: $string")
+                lb.appendLine("${Calendar.getInstance().time}: $string")
                 outputPublisher.onNext(string)
             }
 
             process.errorStream.bufferedReader().forEachLine { string ->
                 Logger.error("[CMDR] Subprocess error received: $string")
-                sb.appendLine("${Calendar.getInstance().time}: $string")
+                lb.appendLine("${Calendar.getInstance().time}: $string")
                 outputPublisher.onNext(string)
             }
 
@@ -257,21 +289,29 @@ class Commander {
             outputPublisher.onComplete()
             val s = "Subprocess exited with code: $exitVal"
             Logger.debug(s)
-            sb.appendLine("\n${Calendar.getInstance().time}: $s")
+            lb.appendLine("\n${Calendar.getInstance().time}: $s")
         } catch (e: Exception) {
             val s = "Subprocess exited with error: ${e.localizedMessage}"
             Logger.error(s)
-            sb.appendLine("\n${Calendar.getInstance().time}: $s")
+            lb.appendLine("\n${Calendar.getInstance().time}: $s")
             outputPublisher.onError(e)
         } finally {
-            logToFile(sb.toString(), userArgs, wdp, executable.id.toString())
+            val name = getProgramName(executable)
+            Logger.logToFile(
+                lb.toString(),
+                userArgs,
+                wdp,
+                executable.id.toString(),
+                name
+            )
             endSession(executable)
         }
     }
 
     /**
-     * Spawns an asynchronous, interactive subprocess that includes an input
-     * publishing route for sending data to the subprocess during its runtime
+     * Spawns an asynchronous, interactive subprocess that include Rx input
+     * publishing routes for sending data to the subprocess during its
+     * runtime, while being bound to the coroutine scope of the caller
      *
      * @param executable subprocess command object
      * @param userArgs command arguments
@@ -279,14 +319,14 @@ class Commander {
      * @param outputPublisher output route for subprocess STDOUT
      * @param receiverScope coroutine scope of caller
      */
-    fun executeRxInteractive(
+    fun executeInteractive(
         executable: ISubprocess,
         userArgs: List<String>,
         inputPublisher: BehaviorProcessor<String>,
         outputPublisher: BehaviorProcessor<String>,
         receiverScope: CoroutineScope = GlobalScope,
     ) {
-        val sb = StringBuilder()
+        val lb = StringBuilder()
         val args = buildArguments(executable, userArgs)
         val wdp = getWorkingDirectoryPath(executable)
         try {
@@ -303,7 +343,7 @@ class Commander {
                         process.errorStream.close()
                         process.destroyForcibly()
                     }
-                    println("Input queued: $sig")
+                    Logger.debug("Input queued: $sig")
                     with(process.outputStream.bufferedWriter()) {
                         write(sig)
                         newLine()
@@ -316,30 +356,35 @@ class Commander {
                 if (string.isNotBlank()) {
                     Logger.debug("[CMDR] CGI process output received: $string")
                     val s = "${Calendar.getInstance().time}: $string"
-                    sb.appendLine(s)
+                    lb.appendLine(s)
                     outputPublisher.onNext(string)
                 }
             }
 
             process.errorStream.bufferedReader().forEachLine { string ->
                 Logger.error("[CMDR] CGI process error received: $string")
-                sb.appendLine("${Calendar.getInstance().time}: $string")
+                lb.appendLine("${Calendar.getInstance().time}: $string")
                 outputPublisher.onNext(string)
             }
 
             val exitVal = process.waitFor()
-
             val s = "Subprocess exited with code: $exitVal"
             Logger.debug(s)
-            sb.appendLine("\n${Calendar.getInstance().time}: $s")
-
+            lb.appendLine("\n${Calendar.getInstance().time}: $s")
             outputPublisher.onComplete()
         } catch (e: Exception) {
             val s = "Subprocess exited with error: ${e.localizedMessage}"
             Logger.error(s)
-            sb.appendLine("\n${Calendar.getInstance().time}: $s")
+            lb.appendLine("\n${Calendar.getInstance().time}: $s")
         } finally {
-            logToFile(sb.toString(), userArgs, wdp, executable.id.toString())
+            val name = getProgramName(executable)
+            Logger.logToFile(
+                lb.toString(),
+                userArgs,
+                wdp,
+                executable.id.toString(),
+                name
+            )
             endSession(executable)
         }
     }
@@ -364,7 +409,7 @@ class Commander {
         var hold = true
         GlobalScope.launch {
             channel.consumeAsFlow().collect {
-                println("Control channel signal received: $it")
+                Logger.debug("Control channel signal received: $it")
                 hold = false
             }
         }
@@ -414,16 +459,7 @@ class Commander {
             )
 
             val process = pb.start()
-            with(process) {
-                println(
-                    """
-                    Subprocess created:
-                        PID: ${pid()}
-                        Command: ${info().command()}
-                """.trimIndent()
-                )
-                sessions.add(Session(this, executable.id))
-            }
+            sessions.add(Session(process, executable.id))
 
             val watchService = FileSystems.getDefault().newWatchService()
             val watchPath = File(watchDirectory).toPath()
@@ -440,7 +476,7 @@ class Commander {
                 val f = File(fileDir)
                 f.deleteOnExit()
                 f.reader().forEachLine { str ->
-                    println("[CMDR] Watch service output received: $str")
+                    Logger.debug("[CMDR] Watch service output received: $str")
                     val out = "${Calendar.getInstance().time}: $str"
                     logBuilder.appendLine(out)
                     s += str
@@ -460,15 +496,17 @@ class Commander {
         } catch (e: Exception) {
             val s = "Subprocess exited with error: ${e.localizedMessage}"
             val c = Calendar.getInstance().time
-            println(s)
+            Logger.error(s)
             logBuilder.appendLine("\n${c}: $s")
             outputPublisher.onError(e)
         } finally {
-            logToFile(
+            val name = getProgramName(executable)
+            Logger.logToFile(
                 logBuilder.toString(),
-                args,
+                userArgs,
                 wdp,
-                executable.id.toString()
+                executable.id.toString(),
+                name
             )
             endSession(executable)
         }
@@ -497,11 +535,27 @@ class Commander {
      * @param code path code for the given command
      * @return path of program to be executed per [IProgram.code]
      */
+    @Throws
     private fun getCommandPath(code: Int): String =
         config?.paths?.values
             ?.first { it.code == code }
             ?.path
             ?: throw RuntimeException("Cannot retrieve command path...")
+
+    /**
+     * Retrieves the program name from the [IngenConfig] path map
+     *
+     * @param ex subprocess object to reference command path from
+     * @return program name string, or null on failure
+     */
+    @Throws
+    private fun getProgramName(ex: ISubprocess) =
+        config
+            ?.paths
+            ?.entries
+            ?.first { it.value.code == ex.command.pathCode }
+            ?.key
+            ?: throw RuntimeException("Cannot retrieve command name...")
 
     /**
      * Gets the working directory [File] object of the given command by
@@ -511,6 +565,7 @@ class Commander {
      * @param ex subprocess command used to compound a working directory
      * @return runtime execution path needed by a given subprocess
      */
+    @Throws
     private fun getWorkingDirectoryPath(ex: ISubprocess) : String {
         config?.let {
             return with(arrayListOf<String>()) {
@@ -593,62 +648,6 @@ class Commander {
             addAll(argsList)
             this.filter { it.isNotBlank() }
         }
-    }
-
-    /**
-     * Writes an output of the given text to a log text file located on the
-     * controller SoM
-     * @param text string to be written to the file
-     * @param args argument list for adding logging details
-     * @param directory directory for log file to be written
-     */
-    // TODO: move to using Logger object method
-    private fun logToFile(
-        text: String,
-        args: List<String>,
-        directory: String,
-        commandName: String
-    ) {
-        val sb = StringBuilder()
-        sb.appendLine(
-            """
-            Begin log for subprocess:
-                command: $commandName
-                working dir: $directory
-                args:
-        """.trimIndent()
-        )
-        args.forEachIndexed { i, s ->
-            sb.appendLine("     Arg $i: $s")
-        }
-
-        sb.appendLine("\n*** Begin subprocess output ***\n")
-
-        text.lines().forEach { sb.appendLine(it) }
-        try {
-            val file = File(
-                // TODO: combine this property with those in config
-                CommandConstants.LOG_DIR,
-                createLogFileName(logName = commandName)
-            )
-            file.bufferedWriter().use { out ->
-                out.write(sb.toString())
-            }
-        } catch (e: FileNotFoundException) {
-            println("Error saving log to file: ${e.localizedMessage}")
-        }
-    }
-
-    /**
-     * Creates a log file name per executed command and returns a path string
-     *
-     * @param logName name to prepend the file path with
-     * @return timestamped path string
-     */
-    private fun createLogFileName(logName: String = "ingen_splog"): String {
-        return "$${logName}_${Calendar.getInstance().time}.txt"
-            .replace(" ", "_")
-            .replace("/", "-")
     }
 
     //endregion

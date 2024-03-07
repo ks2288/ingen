@@ -59,18 +59,22 @@ object Logger {
      * @param args argument list for adding logging details
      * @param directory directory for log file to be written
      */
-    private fun toFile(
+    fun logToFile(
         text: String,
         args: List<String>,
         directory: String,
-        savePath: String
+        commandName: String,
+        logName: String? = "ingen_splog"
     ) {
         val sb = StringBuilder()
-        sb.appendLine("""
+        sb.appendLine(
+            """
             Begin log for subprocess:
+                command: $commandName
                 working dir: $directory
                 args:
-        """.trimIndent())
+        """.trimIndent()
+        )
         args.forEachIndexed { i, s ->
             sb.appendLine("     Arg $i: $s")
         }
@@ -80,14 +84,27 @@ object Logger {
         text.lines().forEach { sb.appendLine(it) }
         try {
             val file = File(
-                savePath,
-                createLogFileName(args = args)
+                // TODO: combine this property with those in config
+                CommandConstants.LOG_DIR,
+                createLogFileName(logName = logName ?: commandName)
             )
             file.bufferedWriter().use { out ->
                 out.write(sb.toString())
             }
         } catch (e: FileNotFoundException) {
-            println("Error saving log to file: ${e.localizedMessage}")
+            Logger.error("Error saving log to file: ${e.localizedMessage}")
         }
+    }
+
+    /**
+     * Creates a log file name per executed command and returns a path string
+     *
+     * @param logName name to prepend the file path with
+     * @return timestamped path string
+     */
+    private fun createLogFileName(logName: String = "ingen_splog"): String {
+        return "$${logName}_${Calendar.getInstance().time}.txt"
+            .replace(" ", "_")
+            .replace("/", "-")
     }
 }

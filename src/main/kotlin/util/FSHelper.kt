@@ -15,7 +15,7 @@ import kotlin.io.path.copyToRecursively
 
 /**
  * Utility object for quickly creating files of a given type within the runtime
- * directory of the Ingen instance
+ * directory of the host system
  *
  * @property BUFFER_SIZE size of the buffer to be used during file operations
  */
