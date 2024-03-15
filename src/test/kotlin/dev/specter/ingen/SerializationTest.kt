@@ -1,11 +1,10 @@
-import command.ISubprocess
-import command.Subprocess
+package dev.specter.ingen
+
+import dev.specter.ingen.util.SerializationHandler
+import dev.specter.ingen.util.TestConstants
 import kotlinx.serialization.json.*
-import message.SerializationHandler
-import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import util.TestConstants
 import java.io.File
 
 class SerializationTest {
@@ -40,9 +39,6 @@ class SerializationTest {
                 }
         }
     }
-
-    @After
-    fun teardown() {}
 
     @Test
     fun test_parse_array() { assert(testArray1?.size == 2) }

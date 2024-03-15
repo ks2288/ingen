@@ -1,11 +1,10 @@
-package command
+package dev.specter.ingen.config
 
-import message.SerializationHandler
-import net.il.IngenConfig
-import net.il.IngenDefaults
-import net.il.util.CommandConstants
-import net.il.util.FSHelper
-import net.il.util.Logger
+import dev.specter.auxi.FSHelper
+import dev.specter.ingen.Subprocess
+import dev.specter.ingen.util.CommandConstants
+import dev.specter.ingen.util.Logger
+import dev.specter.ingen.util.SerializationHandler
 import java.io.File
 
 /**

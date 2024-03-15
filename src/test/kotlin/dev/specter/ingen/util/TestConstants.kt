@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUnsignedTypes::class)
 
-package util
+package dev.specter.ingen.util
 
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString

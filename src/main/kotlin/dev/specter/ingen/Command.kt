@@ -1,6 +1,6 @@
-package command
+package dev.specter.ingen
 
-import command.ProcessType.*
+import dev.specter.ingen.ProcessType.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

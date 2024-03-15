@@ -1,8 +1,10 @@
-import command.ConfigBuilder
+package dev.specter.ingen
+
+import dev.specter.ingen.config.ConfigBuilder
+import dev.specter.ingen.util.TestConstants
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import util.TestConstants
 import kotlin.test.fail
 
 class ConfigBuilderTest {

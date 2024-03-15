@@ -1,4 +1,4 @@
-package net.il
+package dev.specter.ingen.config
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -49,6 +49,12 @@ data class IngenConfig(
     }
 
     companion object {
+        /**
+         * Default fallback runtime directory definition for situations
+         * wherein normal file system access is not available for using this
+         * library traditionally; generally speaking, that will render this
+         * library difficult to leverage outside of test scenarios
+         */
         val INGEN_DEFAULT_DIR = System.getProperty("user.home") + "/.ingen"
     }
 }

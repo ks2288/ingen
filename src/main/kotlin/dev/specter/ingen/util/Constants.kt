@@ -1,13 +1,11 @@
-package net.il.util
+package dev.specter.ingen.util
 
-import net.il.IngenConfig
-// TODO: look into why IDEA is auto-generating these on auto-optimization;
-//  they're from this file
-import net.il.util.CommandConstants.COMMAND_FILE_NAME
-import net.il.util.CommandConstants.COMMAND_FILE_PATH
-import net.il.util.CommandConstants.CONFIG_FILE_NAME
-import net.il.util.CommandConstants.CONFIG_FILE_PATH
-import net.il.util.CommandConstants.LOG_DIR
+import dev.specter.ingen.config.IngenConfig
+import dev.specter.ingen.util.CommandConstants.COMMAND_FILE_NAME
+import dev.specter.ingen.util.CommandConstants.COMMAND_FILE_PATH
+import dev.specter.ingen.util.CommandConstants.CONFIG_FILE_NAME
+import dev.specter.ingen.util.CommandConstants.CONFIG_FILE_PATH
+import dev.specter.ingen.util.CommandConstants.LOG_DIR
 
 /**
  * Utility object for organizing known locations on the host system from which

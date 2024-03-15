@@ -1,18 +1,16 @@
-import command.Command
-import command.ConfigBuilder
-import command.ProcessType
-import command.Subprocess
+package dev.specter.ingen
+
+import dev.specter.ingen.config.ConfigBuilder
+import dev.specter.ingen.util.SerializationHandler
+import dev.specter.ingen.util.TestConstants
 import io.reactivex.rxjava3.core.BackpressureStrategy
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
-import message.SerializationHandler
-import net.il.Commander
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import util.TestConstants
 import java.io.File
 import kotlin.test.fail
 

@@ -1,4 +1,4 @@
-package net.il
+package dev.specter.ingen.config
 
 object IngenDefaults {
     val DEFAULT_CONFIG: String

@@ -1,10 +1,9 @@
 @file:OptIn(DelicateCoroutinesApi::class)
 
-package net.il
+package dev.specter.ingen
 
-import command.ConfigBuilder
-import command.ISubprocess
-import command.Session
+import dev.specter.ingen.config.ConfigBuilder
+import dev.specter.ingen.util.Logger
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -12,7 +11,7 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.flowOn
-import net.il.util.Logger
+import org.jetbrains.annotations.VisibleForTesting
 import java.io.*
 import java.nio.file.FileSystems
 import java.nio.file.StandardWatchEventKinds
@@ -319,6 +318,8 @@ class Commander {
      * @param outputPublisher output route for subprocess STDOUT
      * @param receiverScope coroutine scope of caller
      */
+    // TODO: needs tested per most recent changes that accommodate raw STDIO
+    //  signal buffering from other languages/interpreters
     fun executeInteractive(
         executable: ISubprocess,
         userArgs: List<String>,
@@ -399,6 +400,9 @@ class Commander {
      * @param outputPublisher output route for subprocess STDOUT
      * @param channel input channel for external loop control
      */
+    @VisibleForTesting
+    @Throws
+    // FIXME: see note for executeFileWatcher
     fun spawnWatcherCycle(
         executable: ISubprocess,
         args: List<String>,
@@ -415,7 +419,7 @@ class Commander {
         }
 
         while (hold) {
-            executeFileWatch(
+            executeFileWatcher(
                 executable,
                 args,
                 watchDirectory,
@@ -441,7 +445,12 @@ class Commander {
      * @param watchDirectory directory to be watched for file changes
      * @param outputPublisher output route for subprocess STDOUT
      */
-    fun executeFileWatch(
+    @VisibleForTesting
+    // FIXME: this needs tweaked per the most recent changes to all other
+    //  functions here that now accommodate buffered signals from STD; i.e.,
+    //  change from spawning a single instance in cycle to spawning a single
+    //  cycle via only one subprocess execution
+    fun executeFileWatcher(
         executable: ISubprocess,
         userArgs: List<String>,
         watchDirectory: String,
@@ -608,7 +617,11 @@ class Commander {
      * @param redirectError process error (STDERR) redirection flag
      * @return process builder from which the subprocess will be spawned
      */
-    @Throws(IOException::class, FileNotFoundException::class)
+    @Throws(
+        IOException::class,
+        FileNotFoundException::class,
+        FileSystemException::class
+    )
     private fun buildProcess(
         workingDir: String,
         args: List<String>,

@@ -1,15 +1,14 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
-package message
+package dev.specter.ingen.util
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import net.il.util.Logger
 
 /**
  * Simple utility object for leveraging the KotlinX serialization library to
- * turn decodable objects into class instances with a known JSON configuration
+ * turn serializable strings into typed object instances
  */
 object SerializationHandler {
     // region Properties

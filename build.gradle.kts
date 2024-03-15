@@ -1,3 +1,5 @@
+val spName: String by project
+val spVersion: String by project
 val kotlinxVersion: String by project
 val kotlinxCoroutinesCoreName: String by project
 val kotlinxCoroutinesRx3Name: String by project
@@ -16,22 +18,19 @@ plugins {
     kotlin("plugin.serialization").version("1.8.10")
 }
 
-group = "net.il"
-version = "1.0-SNAPSHOT"
-
-repositories {
-    mavenCentral()
-}
+group = "com.github.ks288"
+version = "1.0.0-SNAPSHOT"
 
 dependencies {
-    implementation("$kotlinxCoroutinesCoreName: $kotlinxVersion")
-    implementation("$kotlinxCoroutinesRx3Name:$kotlinxVersion")
-    implementation("$kotlinxJsonSerializerName:$kotlinxSerialVersion")
-    implementation("$rxKotlinName:$rxKotlinVersion")
-    implementation("$rxJavaName:$rxjavaVersion")
+    api("$kotlinxCoroutinesCoreName: $kotlinxVersion")
+    api("$kotlinxCoroutinesRx3Name:$kotlinxVersion")
+    api("$kotlinxJsonSerializerName:$kotlinxSerialVersion")
+    api("$rxKotlinName:$rxKotlinVersion")
+    api("$rxJavaName:$rxjavaVersion")
+    api("$spName:$spVersion")
+    testImplementation("$kotlinxCoroutinesTestName:$kotlinxVersion")
     testImplementation(kotlin("test"))
     testImplementation(kotlin("test-junit"))
-    testImplementation("$kotlinxCoroutinesTestName:$kotlinxVersion")
 }
 
 kotlin {

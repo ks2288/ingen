@@ -1,4 +1,4 @@
-package net.il.util
+package dev.specter.ingen.util
 
 import java.io.File
 import java.io.FileNotFoundException
@@ -92,7 +92,7 @@ object Logger {
                 out.write(sb.toString())
             }
         } catch (e: FileNotFoundException) {
-            Logger.error("Error saving log to file: ${e.localizedMessage}")
+            error("Error saving log to file: ${e.localizedMessage}")
         }
     }
 
