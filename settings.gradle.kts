@@ -12,4 +12,3 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "ingen"
-

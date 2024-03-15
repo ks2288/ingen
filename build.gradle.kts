@@ -16,10 +16,11 @@ val rxKotlinName: String by project
 plugins {
     kotlin("jvm") version "1.9.20"
     kotlin("plugin.serialization").version("1.8.10")
+    id("maven-publish")
 }
 
 group = "com.github.ks288"
-version = "1.0.0-SNAPSHOT"
+version = "1.0.0"
 
 dependencies {
     api("$kotlinxCoroutinesCoreName: $kotlinxVersion")
@@ -37,13 +38,10 @@ kotlin {
     jvmToolchain(17)
 }
 
-//tasks.register<Exec>("Ingen Filesystem Setup") {
-//    val homePath = System.getProperty("user.home")
-//    workingDir = File(homePath)
-//    if (workingDir.exists()) {
-//
-//    } else workingDir.mkdirs()
-//
-//    this.
-//    commandLine(listOf(""))
-//}
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["kotlin"])
+        }
+    }
+}
