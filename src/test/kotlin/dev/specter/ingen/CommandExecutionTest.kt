@@ -51,7 +51,7 @@ class CommandExecutionTest {
             programAlias = TestConstants.ASYNC_PYTHON_SCRIPT_PATH,
             directory = "",
             typeCode = ProcessType.ASYNC.ordinal,
-            pathCode = 2,
+            pathCode = 3,
             tag = "test executable value emitter python script"
         )
     }
@@ -65,7 +65,7 @@ class CommandExecutionTest {
     fun test_poll_exec() {
         val userArgs = listOf(ECHO_CONTENT)
         val nc = Command(
-            programAlias = "",
+            programAlias = "/bin/echo",
             directory = "",
             typeCode = ProcessType.POLL.ordinal,
             pathCode = 1,
