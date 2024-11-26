@@ -6,6 +6,10 @@ import dev.specter.ingen.util.TestConstants
 import io.reactivex.rxjava3.core.BackpressureStrategy
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.processors.BehaviorProcessor
+import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import org.junit.After
@@ -127,6 +131,36 @@ class CommandExecutionTest {
                 println("Callback flow collected: $it")
                 out.add(it)
             }
+
+            assert(out.size == EXPECTED_COROUTINES_RESULTS_SIZE)
+        }
+    }
+
+    @Test
+    fun testExecuteAsync() {
+        val channel = Channel<String>()
+        val out = arrayListOf<String>()
+        val sp = Subprocess(
+            id = 3,
+            command = mockAsyncCommandCoroutines
+        )
+        runTest {
+            launch {
+                commander.collectAsync(
+                    executable = sp,
+                    userArgs = listOf(),
+                    channel = channel
+                )
+            }
+
+            val job = async {
+                channel.consumeAsFlow().collect {
+                    println("consumer collected output: $it")
+                    out.add(it)
+                }
+            }
+            job.start()
+            job.await()
 
             assert(out.size == EXPECTED_COROUTINES_RESULTS_SIZE)
         }
