@@ -86,7 +86,7 @@ class SerializationTest {
         private const val TEST_ARRAY_FILE_NAME = "test_array.json"
         private const val CMD_ARRAY_FILE_NAME = "test_cmd.json"
         private const val JSON_OBJECT_FILE_NAME = "test_obj.json"
-        private const val EXPECTED_CMD_LIST_SIZE = 8
+        private const val EXPECTED_CMD_LIST_SIZE = 4
         private val JSON_ARRAY_FILE_PATH =
             "${TestConstants.TEST_RES_DIR}/$TEST_ARRAY_FILE_NAME"
         private val CMD_ARRAY_FILE_PATH =

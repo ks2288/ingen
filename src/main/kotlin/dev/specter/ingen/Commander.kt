@@ -562,7 +562,7 @@ class Commander {
         config
             ?.paths
             ?.entries
-            ?.first { it.value.code == ex.command.pathCode }
+            ?.first { it.value.code == ex.command.programCode }
             ?.key
             ?: throw RuntimeException("Cannot retrieve command name...")
 
@@ -602,7 +602,7 @@ class Commander {
             ended.process.destroy()
             sessions.remove(ended)
             val s =
-                "Subprocess terminated\n\tID: $pid\n\tTAG: ${ex.command.tag}\n"
+                "Subprocess terminated\n\tID: $pid\n\tTAG: ${ex.command.description}\n"
             Logger.debug(s)
         } catch (e: Exception) { Logger.error(e) }
     }
@@ -655,7 +655,7 @@ class Commander {
         userArgs: List<String>
     ) : List<String> {
         val argsList = ex.toArgsList(userArgs)
-        val path = getCommandPath(ex.command.pathCode)
+        val path = getCommandPath(ex.command.programCode)
         return with(arrayListOf<String>()) {
             add(path)
             addAll(argsList)

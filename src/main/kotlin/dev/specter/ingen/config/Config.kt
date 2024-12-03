@@ -1,5 +1,6 @@
 package dev.specter.ingen.config
 
+import dev.specter.ingen.ProcessType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -8,10 +9,13 @@ import kotlinx.serialization.Serializable
  *
  * @property code arbitrary, unique program code for use during runtime
  * @property path system-specific path for the designated program
+ * @property processType computed property for retrieving a process type via [code] value
  */
 interface IProgram {
     val code: Int
     val path: String
+    val processType: ProcessType
+        get() = ProcessType.entries.first { it.ordinal == code }
 }
 
 /**
@@ -56,5 +60,8 @@ data class IngenConfig(
          * library difficult to leverage outside of test scenarios
          */
         val INGEN_DEFAULT_DIR = System.getProperty("user.home") + "/.ingen"
+        val INGEN_CONFIG_DIR = "$INGEN_DEFAULT_DIR/config"
+        val INGEN_LOG_DIR = "$INGEN_DEFAULT_DIR/log"
+        val INGEN_MODULE_DIR = "$INGEN_DEFAULT_DIR/module"
     }
 }

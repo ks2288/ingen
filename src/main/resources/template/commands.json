@@ -2,23 +2,45 @@
   {
     "id": 0,
     "command": {
-      "tag": "simple echo command",
+      "pcode": 2,
+      "tcode": 0,
       "alias": "",
-      "directory": "",
-      "escape": null,
-      "typeCode": 0,
-      "pathCode": 2
+      "dir": "",
+      "esc": null,
+      "desc": "echo using /usr/bin/echo"
     }
   },
   {
     "id": 1,
     "command": {
-      "tag": "simple interactive python script",
+      "pcode": 3,
+      "tcode": 2,
       "alias": "module/input_test.py",
-      "directory": "",
+      "dir": "",
       "escape": "xx",
-      "typeCode": 2,
-      "pathCode": 3
+      "desc": "simple interactive python script"
+    }
+  },
+  {
+    "id": 2,
+    "command": {
+      "pcode": 0,
+      "tcode": 1,
+      "alias": "module/async_echo.sh",
+      "dir": "",
+      "esc": "",
+      "desc": "simple FIFO async emitter bash script"
+    }
+  },
+  {
+    "id": 3,
+    "command": {
+      "pcode": 3,
+      "tcode": 1,
+      "alias": "module/async_echo.py",
+      "dir": "",
+      "esc": "",
+      "desc": "simple FIFO async emitter python script"
     }
   }
 ]

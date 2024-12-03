@@ -2,10 +2,14 @@ package dev.specter.ingen.config
 
 import dev.specter.auxi.FSHelper
 import dev.specter.ingen.Subprocess
+import dev.specter.ingen.config.IngenDefaults.CMD_PATH
+import dev.specter.ingen.config.IngenDefaults.CONFIG_PATH
+import dev.specter.ingen.config.IngenDefaults.MODULE_1_PATH
+import dev.specter.ingen.config.IngenDefaults.MODULE_2_PATH
 import dev.specter.ingen.util.CommandConstants
 import dev.specter.ingen.util.Logger
 import dev.specter.ingen.util.SerializationHandler
-import java.io.File
+import java.nio.file.Files
 
 /**
  * Utility object for quickly parsing subprocess commands from a given JSON file
@@ -13,17 +17,48 @@ import java.io.File
 object ConfigBuilder {
 
     fun initializeFS() {
-        val pathSuccess =
-            FSHelper.createPathDirectories(IngenConfig.INGEN_DEFAULT_DIR)
-        Logger.debug("System paths initialized: $pathSuccess")
+        with(FSHelper) {
+            val runtimeDirCreated = createPathDirectories(IngenConfig.INGEN_DEFAULT_DIR)
+            val configDirCreated = createPathDirectories(IngenConfig.INGEN_CONFIG_DIR)
+            val logDirCreated = createPathDirectories(IngenConfig.INGEN_LOG_DIR)
+            val moduleDirCreated = createPathDirectories(IngenConfig.INGEN_MODULE_DIR)
+            Logger.debug("Newly created paths: \n" +
+                    "\tRuntime dir: $runtimeDirCreated\n" +
+                    "\tConfig dir: $configDirCreated\n" +
+                    "\tLog dir: $logDirCreated\n" +
+                    "\tModule dir: $moduleDirCreated\n")
+        }
     }
 
-    fun getIngenRuntimeDirectory(): File? = try {
-        File(IngenConfig.INGEN_DEFAULT_DIR)
+    // TODO: abstract this type of file creation and overwriting in Auxi
+    fun generateDefaultFiles(): Boolean = try {
+        Files.write(
+            CMD_PATH,
+            IngenDefaults.DEFAULT_COMMANDS.toByteArray(),
+//            StandardOpenOption.TRUNCATE_EXISTING
+        )
+        Files.write(
+            CONFIG_PATH,
+            IngenDefaults.DEFAULT_CONFIG.toByteArray(),
+//            StandardOpenOption.TRUNCATE_EXISTING
+        )
+        Files.write(
+            MODULE_1_PATH,
+            ScriptDefaults.INTERACTIVE_PY_TEST_SCRIPT.toByteArray(),
+//            StandardOpenOption.TRUNCATE_EXISTING
+        )
+        Files.write(
+            MODULE_2_PATH,
+            ScriptDefaults.ASYNC_EMITTER_SH_TEST_SCRIPT.toByteArray(),
+//            StandardOpenOption.TRUNCATE_EXISTING
+        )
+
+        true
     } catch (e: Exception) {
         Logger.error(e)
-        null
+        false
     }
+
     /**
      * Takes a path of a subprocess command schema, and parses the file contents
      * into a list of subprocess command objects

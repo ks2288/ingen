@@ -1,6 +1,13 @@
 package dev.specter.ingen.config
 
+import java.nio.file.Paths
+
 object IngenDefaults {
+    val CMD_PATH = Paths.get("${IngenConfig.INGEN_CONFIG_DIR}/commands.json")
+    val CONFIG_PATH = Paths.get("${IngenConfig.INGEN_CONFIG_DIR}/ingen.json")
+    val MODULE_1_PATH = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/async_echo.py")
+    val MODULE_2_PATH = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/async_echo.sh")
+
     val DEFAULT_CONFIG: String
         get() {
             return """
@@ -20,7 +27,11 @@ object IngenDefaults {
                     },
                     "PYTHON": {
                       "CODE": 3,
-                      "PATH": "${System.getProperty("user.home")}/.pyenv/shims/python"
+                      "PATH": "/usr/bin/python"
+                    },
+                    "BTCTL": {
+                      "CODE": 4,
+                      "PATH": "/usr/bin/bluetoothctl"
                     }
                   },
                   "RUNTIME_DIR": "${System.getProperty("user.home")}/.ingen",
@@ -38,89 +49,45 @@ object IngenDefaults {
               {
                 "id": 0,
                 "command": {
-                  "tag": "simple echo command",
+                  "pcode": 2,
+                  "tcode": 0,
                   "alias": "",
-                  "directory": "",
-                  "escape": null,
-                  "typeCode": 0,
-                  "pathCode": 2
+                  "dir": "",
+                  "esc": null,
+                  "desc": "echo using /usr/bin/echo"
                 }
               },
               {
                 "id": 1,
                 "command": {
-                  "tag": "simple interactive python script",
+                  "pcode": 3,
+                  "tcode": 2,
                   "alias": "module/input_test.py",
-                  "directory": "",
+                  "dir": "",
                   "escape": "xx",
-                  "typeCode": 2,
-                  "pathCode": 3
+                  "desc": "simple interactive python script"
                 }
               },
               {
                 "id": 2,
                 "command": {
-                  "tag": "simple FIFO async emitter",
-                  "alias": "./module/mock_async_emitter",
-                  "directory": "",
-                  "escape": "",
-                  "typeCode": 1,
-                  "pathCode": 1
+                  "pcode": 0,
+                  "tcode": 1,
+                  "alias": "module/async_echo.sh",
+                  "dir": "",
+                  "esc": "",
+                  "desc": "simple FIFO async emitter bash script"
                 }
               },
               {
                 "id": 3,
                 "command": {
-                  "tag": "",
-                  "alias": "test",
-                  "directory": "test",
-                  "escape": "",
-                  "typeCode": 1,
-                  "pathCode": 1
-                }
-              },
-              {
-                "id": 4,
-                "command": {
-                  "tag": "",
-                  "alias": "test",
-                  "directory": "test",
-                  "escape": "",
-                  "typeCode": 1,
-                  "pathCode": 1
-                }
-              },
-              {
-                "id": 5,
-                "command": {
-                  "tag": "",
-                  "alias": "test",
-                  "directory": "test",
-                  "escape": "",
-                  "typeCode": 1,
-                  "pathCode": 1
-                }
-              },
-              {
-                "id": 6,
-                "command": {
-                  "tag": "",
-                  "alias": "test",
-                  "directory": "test",
-                  "escape": "",
-                  "typeCode": 1,
-                  "pathCode": 1
-                }
-              },
-              {
-                "id": 7,
-                "command": {
-                  "tag": "",
-                  "alias": "test",
-                  "directory": "test",
-                  "escape": "",
-                  "typeCode": 1,
-                  "pathCode": 1
+                  "pcode": 3,
+                  "tcode": 1,
+                  "alias": "module/async_echo.py",
+                  "dir": "",
+                  "esc": "",
+                  "desc": "simple FIFO async emitter python script"
                 }
               }
             ]

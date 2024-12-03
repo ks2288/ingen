@@ -7,20 +7,21 @@ import kotlinx.serialization.Serializable
 /**
  * Contract for all commands harvested and decoded from JSON spec files
  *
- * @property tag description of referenced program
+ * @property programCode ordinal path code of referenced program
+ * @property typeCode ordinal path code of referenced program
  * @property directory working directory for command
  * @property programAlias name of helper/script files, i.e., `runner.py`
  * @property escapeSequence key sequence for signaling process termination
- * @property pathCode ordinal path code of referenced program
- * @property typeCode ordinal type code of referenced program
+ * @property description brief explanation of referenced command
+ *
  */
 interface ICommand {
-    val tag: String
-    val directory: String
-    val programAlias: String
-    val escapeSequence: String?
-    val pathCode: Int
+    val programCode: Int
     val typeCode: Int
+    val programAlias: String
+    val directory: String
+    val escapeSequence: String?
+    val description: String
 }
 
 /**
@@ -85,14 +86,18 @@ enum class ProcessType {
  */
 @Serializable
 data class Command(
-    override val tag: String,
+    @SerialName("pcode")
+    override val programCode: Int,
+    @SerialName("tcode")
+    override val typeCode: Int,
     @SerialName("alias")
     override val programAlias: String,
+    @SerialName("dir")
     override val directory: String,
-    @SerialName("escape")
+    @SerialName("esc")
     override val escapeSequence: String? = null,
-    override val pathCode: Int,
-    override val typeCode: Int
+    @SerialName("desc")
+    override val description: String
 ): ICommand {
     val processType: ProcessType
         get() = ProcessType.entries.first { it.ordinal == typeCode }

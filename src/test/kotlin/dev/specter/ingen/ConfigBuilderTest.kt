@@ -19,9 +19,15 @@ class ConfigBuilderTest {
         val commands = ConfigBuilder.buildCommands(TestConstants.TEST_COMMAND_FILE_PATH)
         commands?.let { c ->
             c.forEach {
-                assert(it.command.tag == EXPECTED_TEST_STRING)
+                assert(it.command.description == EXPECTED_TEST_STRING)
             }
         } ?: fail()
+    }
+
+    @Test
+    fun testGenerateDefaultFiles() {
+        ConfigBuilder.initializeFS()
+        assert(ConfigBuilder.generateDefaultFiles())
     }
 
     @Test
@@ -48,16 +54,16 @@ class ConfigBuilderTest {
     @Test
     fun testParseCommandsFromDefaults() {
         // intentionally give this a bad path to force default val parsing
-        val config = ConfigBuilder.buildCommands("")
+        val config = ConfigBuilder.buildCommands()
         assert(
             config
-                ?.any { it.command.tag == EXPECTED_TEST_TAG } == true
+                ?.any { it.command.description == EXPECTED_TEST_TAG } == true
         )
     }
 
     companion object {
         private const val EXPECTED_TEST_STRING = "TEST"
         private const val EXPECTED_TEST_PATH = "/bin/echo"
-        private const val EXPECTED_TEST_TAG = "simple echo command"
+        private const val EXPECTED_TEST_TAG = "echo using /usr/bin/echo"
     }
 }

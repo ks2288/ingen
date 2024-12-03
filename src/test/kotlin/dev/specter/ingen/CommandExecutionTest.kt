@@ -47,16 +47,16 @@ class CommandExecutionTest {
             programAlias = TestConstants.ASYNC_SHELL_SCRIPT_PATH,
             directory = "",
             typeCode = ProcessType.ASYNC.ordinal,
-            pathCode = 0,
-            tag = "test executable value emitter shell script"
+            programCode = 0,
+            description = "test executable value emitter shell script"
         )
 
         mockAsyncCommandCoroutines = Command(
             programAlias = TestConstants.ASYNC_PYTHON_SCRIPT_PATH,
             directory = "",
             typeCode = ProcessType.ASYNC.ordinal,
-            pathCode = 3,
-            tag = "test executable value emitter python script"
+            programCode = 3,
+            description = "test executable value emitter python script"
         )
     }
 
@@ -69,11 +69,11 @@ class CommandExecutionTest {
     fun test_poll_exec() {
         val userArgs = listOf(ECHO_CONTENT)
         val nc = Command(
-            programAlias = "/bin/echo",
+            programAlias = "",
             directory = "",
             typeCode = ProcessType.POLL.ordinal,
-            pathCode = 1,
-            tag = "test command using /bin/echo"
+            programCode = 2,
+            description = "test command using /bin/echo"
         )
         val echoCmd = Subprocess(
             id = 1,
