@@ -20,7 +20,7 @@ plugins {
 }
 
 group = "com.github.ks288"
-version = "1.0.1-SNAPSHOT"
+version = "1.0.1"
 
 dependencies {
     api("$kotlinxCoroutinesCoreName: $kotlinxVersion")
