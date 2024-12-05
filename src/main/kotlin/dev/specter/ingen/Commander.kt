@@ -49,18 +49,27 @@ class Commander {
      *
      * @param executable subprocess command object
      * @param userArgs string array containing the process args
+     * @param env string map of any necessary environment variables for prime program
+     * @param retainConfigEnvironment whether to retain all env vars from config file
      * @return text of process's stdout
      */
     fun execute(
         executable: ISubprocess,
         userArgs: List<String>,
+        env: MutableMap<String, String> = mutableMapOf(),
+        retainConfigEnvironment: Boolean = true
     ): String {
         val outputBuilder = StringBuilder()
         val logBuilder = StringBuilder()
         val wdp = getWorkingDirectoryPath(executable)
         val args = buildArguments(executable, userArgs)
         try {
-            val pb = buildProcess(workingDir = wdp, args = args)
+            val pb = buildProcess(
+                workingDir = wdp,
+                args = args,
+                env = env
+            )
+            val ev = pb.environment()
             val process = pb.start()
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val errorReader =
@@ -120,12 +129,16 @@ class Commander {
      * @param executable subprocess command object
      * @param userArgs string array containing the process args
      * @param flowContext coroutine context to receive channel flow on
+     * @param env string map of any necessary environment variables for prime program
+     * @param retainConfigEnvironment whether to retain all env vars from config file
      * @return coroutine channel flow for monitoring subprocess output
      */
     fun executeChannelFlow(
         executable: ISubprocess,
         userArgs: List<String>,
-        flowContext: CoroutineContext = Dispatchers.IO
+        env: MutableMap<String, String> = mutableMapOf(),
+        flowContext: CoroutineContext = Dispatchers.IO,
+        retainConfigEnvironment: Boolean = true
     ) = channelFlow {
         val sb = StringBuilder()
         val wdp = getWorkingDirectoryPath(executable)
@@ -134,6 +147,7 @@ class Commander {
             val pb = buildProcess(
                 workingDir = wdp,
                 args = args,
+                env = env,
                 redirectInput = true,
                 redirectError = true
             )
@@ -188,6 +202,7 @@ class Commander {
     suspend fun collectAsync(
         executable: ISubprocess,
         userArgs: List<String>,
+        env: MutableMap<String, String> = mutableMapOf(),
         channel: SendChannel<String>,
         operationContext: CoroutineContext = Dispatchers.IO
     ) = withContext(operationContext) {
@@ -198,6 +213,7 @@ class Commander {
             val pb = buildProcess(
                 workingDir = wdp,
                 args = args,
+                env = env,
                 redirectInput = true,
                 redirectError = true
             )
@@ -256,6 +272,7 @@ class Commander {
     fun executeRx(
         executable: ISubprocess,
         userArgs: List<String>,
+        env: MutableMap<String, String> = mutableMapOf(),
         outputPublisher: BehaviorProcessor<String>,
     ) {
         val lb = StringBuilder()
@@ -265,6 +282,7 @@ class Commander {
             val pb = buildProcess(
                 workingDir = wdp,
                 args = args,
+                env = env,
                 redirectInput = true,
                 redirectError = true
             )
@@ -323,6 +341,7 @@ class Commander {
     fun executeInteractive(
         executable: ISubprocess,
         userArgs: List<String>,
+        env: MutableMap<String, String> = mutableMapOf(),
         inputPublisher: BehaviorProcessor<String>,
         outputPublisher: BehaviorProcessor<String>,
         receiverScope: CoroutineScope = GlobalScope,
@@ -331,7 +350,11 @@ class Commander {
         val args = buildArguments(executable, userArgs)
         val wdp = getWorkingDirectoryPath(executable)
         try {
-            val pb = buildProcess(workingDir = wdp, args = args)
+            val pb = buildProcess(
+                workingDir = wdp,
+                args = args,
+                env = env
+            )
             val process = pb.start()
             sessions.add(Session(process, executable.id))
 
@@ -406,6 +429,7 @@ class Commander {
     fun spawnWatcherCycle(
         executable: ISubprocess,
         args: List<String>,
+        env: MutableMap<String, String> = mutableMapOf(),
         watchDirectory: String,
         outputPublisher: BehaviorProcessor<String>,
         channel: Channel<Int>,
@@ -422,6 +446,7 @@ class Commander {
             executeFileWatcher(
                 executable,
                 args,
+                env,
                 watchDirectory,
                 outputPublisher,
             )
@@ -453,6 +478,7 @@ class Commander {
     fun executeFileWatcher(
         executable: ISubprocess,
         userArgs: List<String>,
+        env: MutableMap<String, String> = mutableMapOf(),
         watchDirectory: String,
         outputPublisher: BehaviorProcessor<String>,
     ) {
@@ -463,6 +489,7 @@ class Commander {
             val pb = buildProcess(
                 workingDir = wdp,
                 args = args,
+                env = env,
                 redirectInput = true,
                 redirectError = true
             )
@@ -578,9 +605,9 @@ class Commander {
     private fun getWorkingDirectoryPath(ex: ISubprocess) : String {
         config?.let {
             return with(arrayListOf<String>()) {
-                add(it.runtimeDirectory)
-                add(ex.command.directory)
-                filterNot { it.isBlank() }
+                if (ex.command.directory.isBlank())
+                    add("${it.runtimeDirectory}/")
+                else add("${ex.command.directory}/")
                 val sb = StringBuilder()
                 forEach {  s -> sb.append(s) }
                 val s = sb.toString()
@@ -625,6 +652,8 @@ class Commander {
     private fun buildProcess(
         workingDir: String,
         args: List<String>,
+        env: MutableMap<String, String>,
+        retainConfigEnvironment: Boolean = true,
         redirectInput: Boolean = false,
         redirectOutput: Boolean = false,
         redirectError: Boolean = false
@@ -635,6 +664,14 @@ class Commander {
             if (redirectInput) redirectInput()
             if (redirectOutput) redirectOutput()
             if (redirectError) redirectError()
+
+            if (retainConfigEnvironment)
+                config?.envVar
+                    ?.filter { env.containsKey(it.key).not() }
+                    ?.forEach { v -> env[v.key] = v.value }
+
+            for (i in env)
+                environment()[i.key] = i.value
             directory(wdf)
             command(args)
         }

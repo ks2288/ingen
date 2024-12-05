@@ -35,22 +35,18 @@ object ConfigBuilder {
         Files.write(
             CMD_PATH,
             IngenDefaults.DEFAULT_COMMANDS.toByteArray(),
-//            StandardOpenOption.TRUNCATE_EXISTING
         )
         Files.write(
             CONFIG_PATH,
             IngenDefaults.DEFAULT_CONFIG.toByteArray(),
-//            StandardOpenOption.TRUNCATE_EXISTING
         )
         Files.write(
             MODULE_1_PATH,
             ScriptDefaults.INTERACTIVE_PY_TEST_SCRIPT.toByteArray(),
-//            StandardOpenOption.TRUNCATE_EXISTING
         )
         Files.write(
             MODULE_2_PATH,
             ScriptDefaults.ASYNC_EMITTER_SH_TEST_SCRIPT.toByteArray(),
-//            StandardOpenOption.TRUNCATE_EXISTING
         )
 
         true

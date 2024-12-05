@@ -1,7 +1,6 @@
 package dev.specter.ingen
 
 import dev.specter.ingen.config.ConfigBuilder
-import dev.specter.ingen.util.SerializationHandler
 import dev.specter.ingen.util.TestConstants
 import io.reactivex.rxjava3.core.BackpressureStrategy
 import io.reactivex.rxjava3.kotlin.subscribeBy
@@ -11,20 +10,15 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonArray
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import java.io.File
 import kotlin.test.fail
 
 class CommandExecutionTest {
     private lateinit var commander: Commander
-    private lateinit var jsonArrayString: String
     private lateinit var outputPublisher: BehaviorProcessor<String>
     private lateinit var inputPublisher: BehaviorProcessor<String>
-    private var testArray: JsonArray? = null
-    private val execList = arrayListOf<Subprocess>()
     private lateinit var mockAsyncCommandRx: Command
     private lateinit var mockAsyncCommandCoroutines: Command
 
@@ -34,15 +28,7 @@ class CommandExecutionTest {
         commander = Commander()
         outputPublisher = BehaviorProcessor.create()
         inputPublisher = BehaviorProcessor.create()
-        jsonArrayString = File(JSON_ARRAY_FILE_PATH).readText()
-        testArray =
-            SerializationHandler.parseJsonArrayFromString(jsonArrayString)
-        testArray?.forEach {
-            val decoded =
-                SerializationHandler.serializableFromElement<Subprocess>(it)
 
-            decoded?.let { sp -> execList.add(sp) }
-        }
         mockAsyncCommandRx = Command(
             programAlias = TestConstants.ASYNC_SHELL_SCRIPT_PATH,
             directory = "",
@@ -79,6 +65,7 @@ class CommandExecutionTest {
             id = 1,
             command = nc
         )
+
         // trim end to remove newline
         val out = commander.execute(echoCmd, userArgs).trimEnd()
         assert(out == ECHO_CONTENT)

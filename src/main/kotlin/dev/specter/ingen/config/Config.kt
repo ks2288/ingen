@@ -41,7 +41,7 @@ data class IngenConfig(
     @SerialName("RUNTIME_DIR")
     val runtimeDirectory: String = INGEN_DEFAULT_DIR,
     @SerialName("ENV")
-    val environmentVariables: Map<String, String> = mapOf()
+    val envVar: Map<String, String> = mapOf()
 ) {
     /**
      * Produces a list of command names for easier designation throughout the
