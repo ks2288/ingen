@@ -68,9 +68,9 @@ class Commander {
             val pb = buildProcess(
                 workingDir = wdp,
                 args = args,
-                env = env
+                env = env,
+                retainConfigEnvironment = retainConfigEnvironment
             )
-            val ev = pb.environment()
             val process = pb.start()
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val errorReader =
@@ -117,24 +117,36 @@ class Commander {
         return outputBuilder.toString()
     }
 
+    /**
+     * Executes an environment process via the JRE with the given args
+     *
+     * @param commandPath path to system command
+     * @param args any necessary arguments, with any needed alias at index 0
+     * @param env string map of any necessary environment variables for prime program
+     * @param workingDir directory from which to spawn the subprocess
+     * @param retainConfigEnvironment whether to retain all env vars from config file
+     * @return text of process's stdout
+     */
     fun executeExplicit(
         commandPath: String,
         args: List<String>,
         env: MutableMap<String, String> = mutableMapOf(),
-        workingDir: String = IngenConfig.INGEN_DEFAULT_DIR
+        workingDir: String = IngenConfig.INGEN_DEFAULT_DIR,
+        retainConfigEnvironment: Boolean = true
     ): String {
         val outputBuilder = StringBuilder()
         val logBuilder = StringBuilder()
         try {
-            val cmd = with(arrayListOf<String>()) {
+            val cmdArgList = with(arrayListOf<String>()) {
                 add(commandPath)
                 addAll(args)
                 this
             }
             val pb = buildProcess(
                 workingDir = workingDir,
-                args = cmd,
-                env = env
+                args = cmdArgList,
+                env = env,
+                retainConfigEnvironment = retainConfigEnvironment
             )
             val process = pb.start()
 
@@ -215,7 +227,8 @@ class Commander {
                 args = args,
                 env = env,
                 redirectInput = true,
-                redirectError = true
+                redirectError = true,
+                retainConfigEnvironment = retainConfigEnvironment
             )
 
             val process = pb.start()
@@ -270,7 +283,8 @@ class Commander {
         userArgs: List<String>,
         env: MutableMap<String, String> = mutableMapOf(),
         channel: SendChannel<String>,
-        operationContext: CoroutineContext = Dispatchers.IO
+        operationContext: CoroutineContext = Dispatchers.IO,
+        retainConfigEnvironment: Boolean = true
     ) = withContext(operationContext) {
         val logBuilder = StringBuilder()
         val wdp = getWorkingDirectoryPath(executable)
@@ -281,7 +295,8 @@ class Commander {
                 args = args,
                 env = env,
                 redirectInput = true,
-                redirectError = true
+                redirectError = true,
+                retainConfigEnvironment = retainConfigEnvironment
             )
 
             val process = pb.start()
@@ -340,6 +355,7 @@ class Commander {
         userArgs: List<String>,
         env: MutableMap<String, String> = mutableMapOf(),
         outputPublisher: BehaviorProcessor<String>,
+        retainConfigEnvironment: Boolean = true
     ) {
         val lb = StringBuilder()
         val args = buildArguments(executable, userArgs)
@@ -350,7 +366,8 @@ class Commander {
                 args = args,
                 env = env,
                 redirectInput = true,
-                redirectError = true
+                redirectError = true,
+                retainConfigEnvironment = retainConfigEnvironment
             )
 
             val process = pb.start()
@@ -411,6 +428,7 @@ class Commander {
         inputPublisher: BehaviorProcessor<String>,
         outputPublisher: BehaviorProcessor<String>,
         receiverScope: CoroutineScope = GlobalScope,
+        retainConfigEnvironment: Boolean = true
     ) {
         val lb = StringBuilder()
         val args = buildArguments(executable, userArgs)
@@ -419,7 +437,8 @@ class Commander {
             val pb = buildProcess(
                 workingDir = wdp,
                 args = args,
-                env = env
+                env = env,
+                retainConfigEnvironment = retainConfigEnvironment
             )
             val process = pb.start()
             sessions.add(Session(process, executable.id))
@@ -476,6 +495,104 @@ class Commander {
                 name
             )
             endSession(executable)
+        }
+    }
+
+    /**
+     * Identical behavior to [executeInteractive], except this overload allows
+     * the caller to specify all elements of a subprocess/command as opposed to
+     * relying on the configuration files
+     *
+     * @param commandPath path to command, ex. /bin/python
+     * @param args command arguments, with alias at index 0 if needed
+     * @param workingDir working directory from which to execute command
+     * @param pid manually-determined process ID (sovereign of Unix PID)
+     * @param env any environment variables to be added to [ProcessBuilder]
+     * @param inputPublisher input route for subprocess STDIN
+     * @param outputPublisher output route for subprocess STDOUT
+     * @param receiverScope coroutine scope of caller
+     * @param retainConfigEnvironment retain all env variables from config
+     */
+    fun executeExplicitInteractive(
+        commandPath: String,
+        args: List<String>,
+        workingDir: String,
+        pid: Int,
+        env: MutableMap<String, String> = mutableMapOf(),
+        inputPublisher: BehaviorProcessor<String>,
+        outputPublisher: BehaviorProcessor<String>,
+        receiverScope: CoroutineScope = GlobalScope,
+        retainConfigEnvironment: Boolean = true
+    ) {
+        val logBuilder = StringBuilder()
+        try {
+            val cmdArgList = with(arrayListOf<String>()) {
+                add(commandPath)
+                addAll(args)
+                this
+            }
+
+            val pb = buildProcess(
+                workingDir = workingDir,
+                args = cmdArgList,
+                env = env,
+                retainConfigEnvironment = retainConfigEnvironment
+            )
+            val process = pb.start()
+            sessions.add(Session(process, pid))
+
+            // background job for accepting input and writing to subproc STDIN
+            receiverScope.launch {
+                inputPublisher.subscribe { sig ->
+                    if (sig == "SIGKILL") {
+                        process.outputStream.close()
+                        process.inputStream.close()
+                        process.errorStream.close()
+                        process.destroyForcibly()
+                    }
+                    Logger.debug("Input queued: $sig")
+                    with(process.outputStream.bufferedWriter()) {
+                        write(sig)
+                        newLine()
+                        flush()
+                    }
+                }
+            }
+
+            process.inputStream.bufferedReader().forEachLine { string ->
+                if (string.isNotBlank()) {
+                    Logger.debug("[CMDR] CGI process output received: $string")
+                    val s = "${Calendar.getInstance().time}: $string"
+                    logBuilder.appendLine(s)
+                    outputPublisher.onNext(string)
+                }
+            }
+
+            process.errorStream.bufferedReader().forEachLine { string ->
+                Logger.error("[CMDR] CGI process error received: $string")
+                logBuilder.appendLine("${Calendar.getInstance().time}: $string")
+                outputPublisher.onNext(string)
+            }
+
+            val exitVal = process.waitFor()
+            val s = "Subprocess exited with code: $exitVal"
+            Logger.debug(s)
+            logBuilder.appendLine("\n${Calendar.getInstance().time}: $s")
+
+            outputPublisher.onComplete()
+        } catch (e: Exception) {
+            val s = "Subprocess exited with error: ${e.localizedMessage}"
+            Logger.error(s)
+            logBuilder.appendLine("\n${Calendar.getInstance().time}: $s")
+        } finally {
+            Logger.logToFile(
+                logBuilder.toString(),
+                args = args,
+                commandId = "N/A",
+                name = commandPath,
+                directory = workingDir
+            )
+            endSession(pid)
         }
     }
 
@@ -689,17 +806,23 @@ class Commander {
      * @param ex subprocess to cross-reference the session ID from
      */
     private fun endSession(ex: ISubprocess) {
+        val ended = sessions.first { s -> ex.id == s.subprocessId }
+        val pid = ended.process.pid()
+        endSession(pid.toInt())
+    }
+
+
+    private fun endSession(pid: Int) {
         try {
-            val ended = sessions.first { s -> ex.id == s.subprocessId }
-            val pid = ended.process.pid()
+            val ended = sessions.first { s -> pid == s.subprocessId }
             ended.process.destroy()
             sessions.remove(ended)
             val s =
-                "Subprocess terminated\n\tID: $pid\n\tTAG: ${ex.command.description}\n"
+                "Subprocess terminated\n\tID: $pid\n\tTAG: N/A (Explicit " +
+                        "execution)\n"
             Logger.debug(s)
         } catch (e: Exception) { Logger.error(e) }
     }
-
     /**
      * Modular function for building a process for all types of sessions
      *

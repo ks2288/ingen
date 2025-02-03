@@ -1,18 +1,22 @@
+@file:OptIn(DelicateCoroutinesApi::class)
+
 package dev.specter.ingen
 
 import dev.specter.ingen.config.ConfigBuilder
+import dev.specter.ingen.config.IngenConfig
 import dev.specter.ingen.util.TestConstants
 import io.reactivex.rxjava3.core.BackpressureStrategy
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.processors.BehaviorProcessor
-import kotlinx.coroutines.async
+import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import kotlin.concurrent.thread
 import kotlin.test.fail
 
 class CommandExecutionTest {
@@ -48,7 +52,12 @@ class CommandExecutionTest {
 
     @After
     fun teardown() {
-        commander.killAll()
+        GlobalScope.launch {
+            // we delay to avoid thread-based race conditions, allowing all
+            // subprocess cleanup to take place before they are killed
+            delay(5000)
+            commander.killAll()
+        }
     }
 
     @Test
@@ -108,6 +117,66 @@ class CommandExecutionTest {
         runTest { assert(out.size == EXPECTED_MONITOR_OUTPUT_SIZE) }
     }
 
+    // Test interactive subprocess management, specific to a Python subprocess
+    @Test
+    fun test_subprocess_python_input_channel() {
+        val out = arrayListOf<String>()
+        val ip = BehaviorProcessor.create<String>()
+        val op = BehaviorProcessor.create<String>()
+
+        op.toObservable()
+            .toFlowable(BackpressureStrategy.LATEST)
+            .observeOn(Schedulers.io())
+            .filter { it.isNotEmpty() }
+            .subscribeBy(
+                onNext = {
+                    println("Flowable observed: $it")
+                    out.add(it)
+                },
+                onError = {
+                    fail(("Flowable test error: ${it.localizedMessage}"))
+                }
+            )
+
+        // timed interactive console inputs
+        val job = GlobalScope.async {
+            delay(3000)
+            ip.onNext("test1")
+            delay(1000)
+            ip.onNext("test2")
+            delay(1000)
+            ip.onNext("xx")
+        }
+
+        // simulated service thread wrapper
+        thread {
+            commander.executeExplicitInteractive(
+                commandPath = PYTHON_PATH,
+                args = listOf(INTERACTIVE_MODULE_PATH),
+                workingDir = IngenConfig.INGEN_DEFAULT_DIR,
+                pid = 10001,
+                inputPublisher = ip,
+                outputPublisher = op
+            )
+//            commander.monitorControlChannel(
+//                args = INPUT_TEST_ARGS,
+//                directory = TEST_DIR,
+//                inputPublisher = ip,
+//                outputPublisher = op
+//            )
+        }
+
+        // start job after subprocess is launched
+        job.start()
+
+        // assert after awaiting input simulation job
+        runTest {
+            job.await()
+            delay(2000)
+            assert(out.size == EXPECTED_INPUT_RESULT_SIZE_PYTHON)
+        }
+    }
+
     @Test
     fun test_execute_channel_flow() {
         runTest {
@@ -160,12 +229,15 @@ class CommandExecutionTest {
     }
 
     companion object {
-        private const val JSON_ARRAY_FILE_NAME = "test_cmd.json"
-        private val JSON_ARRAY_FILE_PATH =
-            "${TestConstants.TEST_RES_DIR}/$JSON_ARRAY_FILE_NAME"
+        private val USER_HOME = System.getProperty("user.home")
         private const val ECHO_CONTENT = "test echo"
         private const val EXPECTED_MONITOR_OUTPUT_SIZE = 10
         private const val EXPECTED_COROUTINES_RESULTS_SIZE = 5
         private const val ECHO_PATH = "/bin/echo"
+        private val PYTHON_PATH = "$USER_HOME/.pyenv/shims/python"
+        private val INTERACTIVE_MODULE_PATH = "${IngenConfig
+            .INGEN_MODULE_DIR}/python/input_tester.py"
+        private const val EXPECTED_INPUT_RESULT_SIZE_PYTHON = 3
+
     }
 }
