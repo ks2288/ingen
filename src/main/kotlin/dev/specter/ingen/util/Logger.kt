@@ -28,15 +28,15 @@ object Logger {
     }
 
     fun error(message: String) {
-        println(message)
+        System.err.println(message)
     }
 
     fun error(e: Exception) {
-        println(e.localizedMessage)
+        error(e.localizedMessage)
     }
 
     fun error(e: Throwable) {
-        println(e.localizedMessage)
+        error(e.localizedMessage)
     }
 
     /**
@@ -63,14 +63,15 @@ object Logger {
         text: String,
         args: List<String>,
         directory: String,
-        commandName: String,
-        logName: String? = "ingen_splog"
+        commandId: String,
+        name: String? = "ingen_splog"
     ) {
         val sb = StringBuilder()
         sb.appendLine(
             """
             Begin log for subprocess:
-                command: $commandName
+                command ID: $commandId
+                command name: $name
                 working dir: $directory
                 args:
         """.trimIndent()
@@ -86,7 +87,7 @@ object Logger {
             val file = File(
                 // TODO: combine this property with those in config
                 CommandConstants.LOG_DIR,
-                createLogFileName(logName = logName ?: commandName)
+                createLogFileName(logName = name ?: commandId)
             )
             file.bufferedWriter().use { out ->
                 out.write(sb.toString())

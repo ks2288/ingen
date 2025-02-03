@@ -3,6 +3,7 @@
 package dev.specter.ingen
 
 import dev.specter.ingen.config.ConfigBuilder
+import dev.specter.ingen.config.IngenConfig
 import dev.specter.ingen.util.Logger
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import kotlinx.coroutines.*
@@ -111,6 +112,71 @@ class Commander {
                 wdp,
                 executable.id.toString(),
                 name
+            )
+        }
+        return outputBuilder.toString()
+    }
+
+    fun executeExplicit(
+        commandPath: String,
+        args: List<String>,
+        env: MutableMap<String, String> = mutableMapOf(),
+        workingDir: String = IngenConfig.INGEN_DEFAULT_DIR
+    ): String {
+        val outputBuilder = StringBuilder()
+        val logBuilder = StringBuilder()
+        try {
+            val cmd = with(arrayListOf<String>()) {
+                add(commandPath)
+                addAll(args)
+                this
+            }
+            val pb = buildProcess(
+                workingDir = workingDir,
+                args = cmd,
+                env = env
+            )
+            val process = pb.start()
+
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val errorReader =
+                BufferedReader(InputStreamReader(process.errorStream))
+
+            reader.forEachLine {
+                Logger.debug("[CMDR] Subprocess output received: $it")
+                logBuilder
+                    .appendLine("${Calendar.getInstance().time}: $it")
+                outputBuilder.appendLine(it)
+            }
+            errorReader.forEachLine {
+                Logger.debug("[CMDR] Subprocess error received: $it")
+                logBuilder
+                    .appendLine("${Calendar.getInstance().time}: $it")
+                outputBuilder.appendLine(it)
+            }
+
+            val exitVal = process.waitFor()
+            with("Subprocess exited with code: $exitVal") {
+                Logger.debug(this)
+                logBuilder
+                    .appendLine("\n${Calendar.getInstance().time}: $this")
+            }
+        } catch (e: Exception) {
+            val s = "[CMDR] Subprocess exited with error: ${e.localizedMessage}"
+            val c = Calendar.getInstance().time
+            with(s) {
+                Logger.error(this)
+                logBuilder.appendLine("${c}: $this")
+                outputBuilder.appendLine(this)
+            }
+
+        } finally {
+            Logger.logToFile(
+                logBuilder.toString(),
+                args,
+                workingDir,
+                commandId = "N/A",
+                commandPath
             )
         }
         return outputBuilder.toString()

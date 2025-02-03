@@ -72,6 +72,12 @@ class CommandExecutionTest {
     }
 
     @Test
+    fun test_poll_exec_explicit() {
+        val out = commander.executeExplicit(ECHO_PATH, listOf(ECHO_CONTENT)).trimEnd()
+        assert(out == ECHO_CONTENT)
+    }
+
+    @Test
     fun test_execute_rx() {
         val exec = Subprocess(
             command = mockAsyncCommandRx,
@@ -160,5 +166,6 @@ class CommandExecutionTest {
         private const val ECHO_CONTENT = "test echo"
         private const val EXPECTED_MONITOR_OUTPUT_SIZE = 10
         private const val EXPECTED_COROUTINES_RESULTS_SIZE = 5
+        private const val ECHO_PATH = "/bin/echo"
     }
 }
