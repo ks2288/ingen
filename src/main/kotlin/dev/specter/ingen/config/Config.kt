@@ -62,6 +62,6 @@ data class IngenConfig(
         val INGEN_DEFAULT_DIR = System.getProperty("user.home") + "/.ingen"
         val INGEN_CONFIG_DIR = "$INGEN_DEFAULT_DIR/config"
         val INGEN_LOG_DIR = "$INGEN_DEFAULT_DIR/log"
-        val INGEN_MODULE_DIR = "$INGEN_DEFAULT_DIR/modules"
+        val INGEN_MODULE_DIR = "$INGEN_DEFAULT_DIR/module"
     }
 }

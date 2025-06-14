@@ -8,6 +8,7 @@ build/
 .idea/modules.xml
 .idea/jarRepositories.xml
 .idea/git_toolbox_blame.xml
+.idea/misc.xml
 #.idea/compiler.xml
 .idea/libraries/
 *.iws

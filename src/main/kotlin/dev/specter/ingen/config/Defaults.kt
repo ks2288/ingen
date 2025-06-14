@@ -1,12 +1,14 @@
 package dev.specter.ingen.config
 
+import java.nio.file.Path
 import java.nio.file.Paths
 
 object IngenDefaults {
-    val CMD_PATH = Paths.get("${IngenConfig.INGEN_CONFIG_DIR}/commands.json")
-    val CONFIG_PATH = Paths.get("${IngenConfig.INGEN_CONFIG_DIR}/ingen.json")
-    val MODULE_1_PATH = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/async_echo.py")
-    val MODULE_2_PATH = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/async_echo.sh")
+    val CMD_PATH: Path = Paths.get("${IngenConfig.INGEN_CONFIG_DIR}/commands.json")
+    val CONFIG_PATH: Path = Paths.get("${IngenConfig.INGEN_CONFIG_DIR}/ingen.json")
+    val MODULE_1_PATH: Path = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/input_tester.py")
+    val MODULE_2_PATH: Path = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/async_echo.sh")
+    val MODULE_3_PATH: Path = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/async_echo.py")
 
     val DEFAULT_CONFIG: String
         get() {
@@ -62,7 +64,7 @@ object IngenDefaults {
                 "command": {
                   "pcode": 3,
                   "tcode": 2,
-                  "alias": "module/input_test.py",
+                  "alias": "module/input_tester.py",
                   "dir": "",
                   "escape": "xx",
                   "desc": "simple interactive python script"
@@ -146,4 +148,38 @@ object ScriptDefaults {
                 done
             """.trimIndent()
         }
+
+    val ASYNC_EMITTER_PY_TEST_SCRIPT: String
+        get() = """
+            import json
+            import sys
+            import time
+
+
+            class Emitter:
+                def __init__(self):
+                    pass
+
+                def run(self):
+                    while True:
+                        time.sleep(2)
+                        count = 0
+                        while count <= 4:
+                            time.sleep(1)
+                            count += 1
+                            message = self.create_message([str(count)])
+                            print(message)
+                        sys.exit(0)
+
+                def create_message(self, content):
+                    msg = {"type": "NOTIFICATION", "content": content}
+                    msg_json = json.dumps(msg)
+                    return msg_json
+
+
+            if __name__ == "__main__":
+                emitter = Emitter()
+                emitter.run()
+
+        """.trimIndent()
 }

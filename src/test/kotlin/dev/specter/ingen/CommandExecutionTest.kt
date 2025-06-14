@@ -117,6 +117,70 @@ class CommandExecutionTest {
         runTest { assert(out.size == EXPECTED_MONITOR_OUTPUT_SIZE) }
     }
 
+    /**
+     * This test represents a "cold" subprocess - aka, one that is NOT wrapped within some kind of async
+     * framework at its own language level (i.e., asyncIO for Python); irrespective of the thread management/scheduling
+     * at the Kotlin level, these types of subprocesses will NOT return a hot flow that is accessible on-demand; that
+     * said, the behavior processor will NOT act as a traditional cold flow, wherein the subprocess gets re-executed
+     * on each subscription; in such a case, the subprocess will need to exit before the results can be accessed by the
+     * subscriber as a single "batch" result
+     */
+    @Test
+    fun test_execute_explicit_rx_cold() {
+        val out = arrayListOf<String>()
+        val op = BehaviorProcessor.create<String>()
+
+        op.toObservable()
+            .toFlowable(BackpressureStrategy.BUFFER)
+            .subscribeBy(
+                onNext = {
+                    println("Test output received: $it")
+                    out.add(it)
+                },
+                onError = { fail("Explicit RX test error...") }
+            )
+
+        commander.executeExplicitRx(
+            commandPath = PYTHON_PATH,
+            args = listOf(EXPLICIT_RX_SCRIPT_PATH),
+            workingDir = IngenConfig.INGEN_DEFAULT_DIR,
+            pid = 101010,
+            outputPublisher = op
+        )
+
+        runTest { assert(out.size == EXPECTED_EXPLICIT_RX_RESULTS_SIZE) }
+    }
+
+    /**
+     * Redundant test of above scenario, wherein asyncIO is used within Python to mitigate the "cold" flow behavior when
+     * wrapping Python, but it appears to have no impact; curiously, the shell scripts do not display this same behavior
+     */
+    @Test
+    fun test_execute_explicit_rx_asyncio() {
+        val out = arrayListOf<String>()
+        val op = BehaviorProcessor.create<String>()
+
+        op.toObservable()
+            .toFlowable(BackpressureStrategy.BUFFER)
+            .subscribeBy(
+                onNext = {
+                    println("Test output received: $it")
+                    out.add(it)
+                },
+                onError = { fail("Explicit RX test error...") }
+            )
+
+        commander.executeExplicitRx(
+            commandPath = PYTHON_PATH,
+            args = listOf(EXPLICIT_RX_SCRIPT_PATH2),
+            workingDir = IngenConfig.INGEN_DEFAULT_DIR,
+            pid = 101010,
+            outputPublisher = op
+        )
+
+        runTest { assert(out.size == EXPECTED_EXPLICIT_RX_RESULTS_SIZE) }
+    }
+
     // Test interactive subprocess management, specific to a Python subprocess
     @Test
     fun test_subprocess_python_input_channel() {
@@ -151,7 +215,7 @@ class CommandExecutionTest {
         // simulated service thread wrapper
         thread {
             commander.executeExplicitInteractive(
-                commandPath = PYTHON_PATH,
+                programPath = PYTHON_PATH,
                 args = listOf(INTERACTIVE_MODULE_PATH),
                 workingDir = IngenConfig.INGEN_DEFAULT_DIR,
                 pid = 10001,
@@ -199,7 +263,7 @@ class CommandExecutionTest {
     }
 
     @Test
-    fun testExecuteAsync() {
+    fun test_execute_async() {
         val channel = Channel<String>()
         val out = arrayListOf<String>()
         val sp = Subprocess(
@@ -236,8 +300,12 @@ class CommandExecutionTest {
         private const val ECHO_PATH = "/bin/echo"
         private val PYTHON_PATH = "$USER_HOME/.pyenv/shims/python"
         private val INTERACTIVE_MODULE_PATH = "${IngenConfig
-            .INGEN_MODULE_DIR}/python/input_tester.py"
-        private const val EXPECTED_INPUT_RESULT_SIZE_PYTHON = 3
+            .INGEN_MODULE_DIR}/input_tester.py"
+        private const val EXPECTED_INPUT_RESULT_SIZE_PYTHON = 2
+        private val EXPLICIT_RX_SCRIPT_PATH = "${TestConstants.TEST_RES_DIR}/test_emitter.py"
+        private val EXPLICIT_RX_SCRIPT_PATH2 = "${TestConstants.TEST_RES_DIR}/test_async_emitter.py"
+
+        private const val EXPECTED_EXPLICIT_RX_RESULTS_SIZE = 5
 
     }
 }

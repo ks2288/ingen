@@ -38,8 +38,21 @@ class Commander {
 
     //region Properties
 
-    private val config = ConfigBuilder.buildConfig()
-    private val sessions = arrayListOf<Session>()
+    private val config: IngenConfig
+    private val sessions: ArrayList<Session>
+
+    //endregion
+
+    //region Constructors
+
+    /**
+     * Explicit init ensures proper chronology for command configuration loading
+     */
+    init {
+        ConfigBuilder.initializeFS()
+        config = ConfigBuilder.buildConfig() ?: IngenConfig()
+        sessions = arrayListOf()
+    }
 
     //endregion
 
@@ -184,11 +197,11 @@ class Commander {
 
         } finally {
             Logger.logToFile(
-                logBuilder.toString(),
-                args,
-                workingDir,
+                text = logBuilder.toString(),
+                args = args,
+                directory = workingDir,
                 commandId = "N/A",
-                commandPath
+                name = commandPath
             )
         }
         return outputBuilder.toString()
@@ -256,10 +269,10 @@ class Commander {
             sb.appendLine("\n${Calendar.getInstance().time}: $s")
         } finally {
             Logger.logToFile(
-                sb.toString(),
-                userArgs,
-                wdp,
-                executable.id.toString()
+                text = sb.toString(),
+                args = userArgs,
+                directory = wdp,
+                commandId = executable.id.toString()
             )
             endSession(executable)
             close()
@@ -329,11 +342,11 @@ class Commander {
         } finally {
             val name = getProgramName(executable)
             Logger.logToFile(
-                logBuilder.toString(),
+                text = logBuilder.toString(),
                 userArgs,
-                wdp,
-                executable.id.toString(),
-                name
+                directory = wdp,
+                commandId = executable.id.toString(),
+                name = name
             )
             endSession(executable)
             channel.close()
@@ -408,6 +421,66 @@ class Commander {
         }
     }
 
+    fun executeExplicitRx(
+        commandPath: String,
+        args: List<String>,
+        workingDir: String,
+        pid: Int,
+        env: MutableMap<String, String> = mutableMapOf(),
+        outputPublisher: BehaviorProcessor<String>,
+        retainConfigEnvironment: Boolean = true
+    ) {
+        val lb = StringBuilder()
+        try {
+            val cmdArgList = with(arrayListOf<String>()) {
+                add(commandPath)
+                addAll(args)
+                this
+            }
+
+            val pb = buildProcess(
+                workingDir = workingDir,
+                args = cmdArgList,
+                env = env,
+                retainConfigEnvironment = retainConfigEnvironment
+            )
+            val process = pb.start()
+            sessions.add(Session(process, pid))
+
+            process.inputStream.bufferedReader().forEachLine { string ->
+                Logger.debug("[CMDR] Subprocess output received: $string")
+                lb.appendLine("${Calendar.getInstance().time}: $string")
+                outputPublisher.onNext(string)
+            }
+
+            process.errorStream.bufferedReader().forEachLine { string ->
+                Logger.error("[CMDR] Subprocess error received: $string")
+                lb.appendLine("${Calendar.getInstance().time}: $string")
+                outputPublisher.onNext(string)
+            }
+
+            val exitVal = process.waitFor()
+            outputPublisher.onComplete()
+            val s = "Subprocess exited with code: $exitVal"
+            Logger.debug(s)
+            lb.appendLine("\n${Calendar.getInstance().time}: $s")
+        } catch (e: Exception) {
+            val s = "Subprocess exited with error: ${e.localizedMessage}"
+            Logger.error(s)
+            lb.appendLine("\n${Calendar.getInstance().time}: $s")
+            outputPublisher.onError(e)
+        } finally {
+            Logger.logToFile(
+                text = lb.toString(),
+                args = args,
+                directory = workingDir,
+                commandId = "N/A",
+                name = commandPath
+            )
+            endSession(pid)
+        }
+    }
+
     /**
      * Spawns an asynchronous, interactive subprocess that include Rx input
      * publishing routes for sending data to the subprocess during its
@@ -419,8 +492,6 @@ class Commander {
      * @param outputPublisher output route for subprocess STDOUT
      * @param receiverScope coroutine scope of caller
      */
-    // TODO: needs tested per most recent changes that accommodate raw STDIO
-    //  signal buffering from other languages/interpreters
     fun executeInteractive(
         executable: ISubprocess,
         userArgs: List<String>,
@@ -503,7 +574,7 @@ class Commander {
      * the caller to specify all elements of a subprocess/command as opposed to
      * relying on the configuration files
      *
-     * @param commandPath path to command, ex. /bin/python
+     * @param programPath path to command, ex. /bin/python
      * @param args command arguments, with alias at index 0 if needed
      * @param workingDir working directory from which to execute command
      * @param pid manually-determined process ID (sovereign of Unix PID)
@@ -514,7 +585,7 @@ class Commander {
      * @param retainConfigEnvironment retain all env variables from config
      */
     fun executeExplicitInteractive(
-        commandPath: String,
+        programPath: String,
         args: List<String>,
         workingDir: String,
         pid: Int,
@@ -527,7 +598,7 @@ class Commander {
         val logBuilder = StringBuilder()
         try {
             val cmdArgList = with(arrayListOf<String>()) {
-                add(commandPath)
+                add(programPath)
                 addAll(args)
                 this
             }
@@ -589,7 +660,7 @@ class Commander {
                 logBuilder.toString(),
                 args = args,
                 commandId = "N/A",
-                name = commandPath,
+                name = programPath,
                 directory = workingDir
             )
             endSession(pid)
@@ -756,10 +827,9 @@ class Commander {
      */
     @Throws
     private fun getCommandPath(code: Int): String =
-        config?.paths?.values
-            ?.first { it.code == code }
-            ?.path
-            ?: throw RuntimeException("Cannot retrieve command path...")
+        config.paths.values
+            .first { it.code == code }
+            .path
 
     /**
      * Retrieves the program name from the [IngenConfig] path map
@@ -770,11 +840,10 @@ class Commander {
     @Throws
     private fun getProgramName(ex: ISubprocess) =
         config
-            ?.paths
-            ?.entries
-            ?.first { it.value.code == ex.command.programCode }
-            ?.key
-            ?: throw RuntimeException("Cannot retrieve command name...")
+            .paths
+            .entries
+            .first { it.value.code == ex.command.programCode }
+            .key
 
     /**
      * Gets the working directory [File] object of the given command by
@@ -786,18 +855,16 @@ class Commander {
      */
     @Throws
     private fun getWorkingDirectoryPath(ex: ISubprocess) : String {
-        config?.let {
-            return with(arrayListOf<String>()) {
-                if (ex.command.directory.isBlank())
-                    add("${it.runtimeDirectory}/")
-                else add("${ex.command.directory}/")
-                val sb = StringBuilder()
-                forEach {  s -> sb.append(s) }
-                val s = sb.toString()
-                Logger.debug("Subprocess working directory: $s")
-                s
-            }
-        } ?: throw RuntimeException("Cannot retrieve IngenConfig...")
+        return with(arrayListOf<String>()) {
+            if (ex.command.directory.isBlank())
+                add("${config.runtimeDirectory}/")
+            else add("${ex.command.directory}/")
+            val sb = StringBuilder()
+            forEach {  s -> sb.append(s) }
+            val s = sb.toString()
+            Logger.debug("Subprocess working directory: $s")
+            s
+        }
     }
 
     /**
@@ -855,9 +922,9 @@ class Commander {
             if (redirectError) redirectError()
 
             if (retainConfigEnvironment)
-                config?.envVar
-                    ?.filter { env.containsKey(it.key).not() }
-                    ?.forEach { v -> env[v.key] = v.value }
+                config.envVar
+                    .filter { env.containsKey(it.key).not() }
+                    .forEach { v -> env[v.key] = v.value }
 
             for (i in env)
                 environment()[i.key] = i.value
