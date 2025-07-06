@@ -4,6 +4,7 @@ package dev.specter.ingen
 
 import dev.specter.ingen.config.ConfigBuilder
 import dev.specter.ingen.config.IngenConfig
+import dev.specter.ingen.util.CommandConstants.SIG_KILL
 import dev.specter.ingen.util.Logger
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import kotlinx.coroutines.*
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.flowOn
 import org.jetbrains.annotations.VisibleForTesting
 import java.io.*
 import java.nio.file.FileSystems
+import java.nio.file.Path
 import java.nio.file.StandardWatchEventKinds
 import java.util.*
 import kotlin.coroutines.CoroutineContext
@@ -799,6 +801,98 @@ class Commander {
                 name
             )
             endSession(executable)
+        }
+    }
+
+    /**
+     * Spawns a file watcher at the given directory, and notifies when files are created, modified, or deleted; will
+     * also echo the contents, if requested
+     *
+     * @param watchDirectory directory to watch for changes
+     * @param outputPublisher Rx publisher for output to caller
+     * @param killChannel coroutines channel for killing the watcher process, when needed
+     * @param echoContents whether to echo the contents of the file to the caller
+     */
+    fun spawnFileWatch(
+        watchDirectory: String,
+        outputPublisher: BehaviorProcessor<String>,
+        killChannel: Channel<Int>,
+        echoContents: Boolean = true
+    ) {
+        val logBuilder = StringBuilder()
+        try {
+            val watchService = FileSystems.getDefault().newWatchService()
+            val watchPath = File(watchDirectory).toPath()
+            val keys = watchPath.register(
+                watchService,
+                StandardWatchEventKinds.ENTRY_CREATE,
+                StandardWatchEventKinds.ENTRY_DELETE,
+                StandardWatchEventKinds.ENTRY_MODIFY
+            )
+            val watchKey = watchService.take()
+            var hold = true
+            GlobalScope.launch {
+                // job to watch caller's channel for kill signal
+                val inputJob = async {
+                    Logger.debug("File watch kill channel launched...")
+                    killChannel.consumeAsFlow().collect {
+                        Logger.debug("File watch control channel signal received: $it")
+                        if (it.toUByte() == SIG_KILL) {
+                            Logger.debug("File watch SIG_KILL received...")
+                            hold = false
+                        }
+                    }
+                }
+                inputJob.start()
+                while (hold) {
+                    for (event in watchKey.pollEvents()) {
+                        val kind = event.kind()
+                        val context = event.context() as Path
+                        val fileDir = "$watchDirectory/${context}"
+                        val s = StringBuilder()
+                        when (kind) {
+                            StandardWatchEventKinds.ENTRY_CREATE -> {
+                                Logger.debug("[CMDR] File created at: $fileDir")
+                                if (echoContents) {
+                                    val f = File(fileDir)
+                                    logBuilder.appendLine("New file contents ($fileDir):")
+                                    f.reader().forEachLine { str ->
+                                        logBuilder.appendLine(str)
+                                        s.appendLine(str)
+                                    }
+                                    outputPublisher.onNext(s.toString())
+                                }
+                            }
+                            StandardWatchEventKinds.ENTRY_DELETE -> {
+                                Logger.debug("[CMDR] File deleted at: $fileDir")
+                            }
+                            StandardWatchEventKinds.ENTRY_MODIFY -> {
+                                Logger.debug("[CMDR] File modified at: $fileDir")
+                            }
+                            else -> Logger.debug("Unhandled event: $kind - $context")
+                        }
+                    }
+                    watchKey.reset()
+                }
+                inputJob.cancel()
+                watchKey.cancel()
+                watchService.close()
+                keys.cancel()
+                outputPublisher.onComplete()
+                Logger.logToFile(
+                    text = logBuilder.toString(),
+                    args = listOf(),
+                    directory = watchDirectory,
+                    commandId = "N/A",
+                    name = "File watcher"
+                )
+            }
+        } catch (e: Exception) {
+            val msg = "File watcher exited with error: ${e.localizedMessage}"
+            val c = Calendar.getInstance().time
+            Logger.error(msg)
+            logBuilder.appendLine("\n${c}: $msg")
+            outputPublisher.onError(e)
         }
     }
 

@@ -298,14 +298,12 @@ class CommandExecutionTest {
         private const val EXPECTED_MONITOR_OUTPUT_SIZE = 10
         private const val EXPECTED_COROUTINES_RESULTS_SIZE = 5
         private const val ECHO_PATH = "/bin/echo"
-        private val PYTHON_PATH = "$USER_HOME/.pyenv/shims/python"
         private val INTERACTIVE_MODULE_PATH = "${IngenConfig
             .INGEN_MODULE_DIR}/input_tester.py"
         private const val EXPECTED_INPUT_RESULT_SIZE_PYTHON = 2
         private val EXPLICIT_RX_SCRIPT_PATH = "${TestConstants.TEST_RES_DIR}/test_emitter.py"
         private val EXPLICIT_RX_SCRIPT_PATH2 = "${TestConstants.TEST_RES_DIR}/test_async_emitter.py"
-
         private const val EXPECTED_EXPLICIT_RX_RESULTS_SIZE = 5
-
+        val PYTHON_PATH = "$USER_HOME/.pyenv/shims/python"
     }
 }
