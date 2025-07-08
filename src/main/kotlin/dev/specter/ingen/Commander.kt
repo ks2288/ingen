@@ -9,20 +9,15 @@ import dev.specter.ingen.util.Logger
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.flow.flowOn
-import org.jetbrains.annotations.VisibleForTesting
 import java.io.*
 import java.nio.file.FileSystems
 import java.nio.file.Path
 import java.nio.file.StandardWatchEventKinds
 import java.util.*
-import kotlin.coroutines.CoroutineContext
 
 /**
- * (God-like) Class for handling all sand-boxed subprocesses via the JDK's
+ * Class for handling all sand-boxed subprocesses via the JDK's
  * [ProcessBuilder], with support for both Rx-based behavioral and
  * Coroutine-based asynchronous result routing; since [ProcessBuilder]
  * handles the waiting for a process termination signal in a semaphore-based
@@ -33,15 +28,16 @@ import kotlin.coroutines.CoroutineContext
  * (Java AWT and Swing, for example) can still handle these async operations
  * without freezing their main/UI thread while awaiting results
  *
+ * @param configuration externally-passed configuration for extensibility
  * @property config configuration instance based on provided config file values
- * @property sessions list of all subprocess sessions for housekeeping
+ * @property procMap list of all subprocess sessions for housekeeping
  */
-class Commander {
+class Commander(configuration: IngenConfig? = null) {
 
     //region Properties
 
     private val config: IngenConfig
-    private val sessions: ArrayList<Session>
+    private val procMap: MutableMap<String, ArrayList<Process>> = mutableMapOf()
 
     //endregion
 
@@ -52,8 +48,7 @@ class Commander {
      */
     init {
         ConfigBuilder.initializeFS()
-        config = ConfigBuilder.buildConfig() ?: IngenConfig()
-        sessions = arrayListOf()
+        config = configuration ?: ConfigBuilder.buildConfig()
     }
 
     //endregion
@@ -125,7 +120,7 @@ class Commander {
                 logBuilder.toString(),
                 userArgs,
                 wdp,
-                executable.id.toString(),
+                executable.callerKey.toString(),
                 name
             )
         }
@@ -210,153 +205,6 @@ class Commander {
     }
 
     /**
-     * Spawns a subprocess and exposes a flow channel to asynchronously report
-     * subprocess I/O and errors to the calling collector; NOTE: unless the
-     * collecting scope/context are properly layered/preserved, this channel
-     * will function as TERMINAL, in that it will execute your command, but the
-     * collected results will only be reported when the subprocess has exited;
-     * realistically, this should only be used within a coroutine-based
-     * framework (such as KTOR) that can guarantee scope preservation (i.e. not
-     * Compose)
-     *
-     * @param executable subprocess command object
-     * @param userArgs string array containing the process args
-     * @param flowContext coroutine context to receive channel flow on
-     * @param env string map of any necessary environment variables for prime program
-     * @param retainConfigEnvironment whether to retain all env vars from config file
-     * @return coroutine channel flow for monitoring subprocess output
-     */
-    fun executeChannelFlow(
-        executable: ISubprocess,
-        userArgs: List<String>,
-        env: MutableMap<String, String> = mutableMapOf(),
-        flowContext: CoroutineContext = Dispatchers.IO,
-        retainConfigEnvironment: Boolean = true
-    ) = channelFlow {
-        val sb = StringBuilder()
-        val wdp = getWorkingDirectoryPath(executable)
-        val args = buildArguments(executable, userArgs)
-        try {
-            val pb = buildProcess(
-                workingDir = wdp,
-                args = args,
-                env = env,
-                redirectInput = true,
-                redirectError = true,
-                retainConfigEnvironment = retainConfigEnvironment
-            )
-
-            val process = pb.start()
-            sessions.add(Session(process, executable.id))
-
-            process.inputStream.bufferedReader().forEachLine { string ->
-                Logger.debug("[CMDR] CGI process output received: $string")
-                sb.appendLine("${Calendar.getInstance().time}: $string")
-                launch { channel.trySend(string) }
-            }
-
-            process.errorStream.bufferedReader().forEachLine { string ->
-                Logger.error("[CMDR] CGI process error received: $string")
-                sb.appendLine("${Calendar.getInstance().time}: $string")
-                launch { channel.trySend(string) }
-            }
-
-            val exitVal = process.waitFor()
-            val s = "Subprocess exited with code: $exitVal"
-            Logger.debug(s)
-            sb.appendLine("\n${Calendar.getInstance().time}: $s")
-        } catch (e: Exception) {
-            val s = "Subprocess exited with error: ${e.localizedMessage}"
-            Logger.error(s)
-            sb.appendLine("\n${Calendar.getInstance().time}: $s")
-        } finally {
-            Logger.logToFile(
-                text = sb.toString(),
-                args = userArgs,
-                directory = wdp,
-                commandId = executable.id.toString()
-            )
-            endSession(executable)
-            close()
-        }
-    }.flowOn(flowContext)
-
-    /**
-     * Collects the results of a single subprocess asynchronously and returns
-     * a cold flow, depending on the receiver context and thread of execution;
-     * for receiving the output of a subprocess as a purely hot flow, use
-     * [executeRx]
-     *
-     * @param executable subprocess command object
-     * @param userArgs string array containing the process args
-     * @param channel receiver for subsequent commands
-     * @param operationContext coroutine context of subprocess execution
-     * @return channel flow of output fed to the route monitor
-     */
-    suspend fun collectAsync(
-        executable: ISubprocess,
-        userArgs: List<String>,
-        env: MutableMap<String, String> = mutableMapOf(),
-        channel: SendChannel<String>,
-        operationContext: CoroutineContext = Dispatchers.IO,
-        retainConfigEnvironment: Boolean = true
-    ) = withContext(operationContext) {
-        val logBuilder = StringBuilder()
-        val wdp = getWorkingDirectoryPath(executable)
-        val args = buildArguments(executable, userArgs)
-        try {
-            val pb = buildProcess(
-                workingDir = wdp,
-                args = args,
-                env = env,
-                redirectInput = true,
-                redirectError = true,
-                retainConfigEnvironment = retainConfigEnvironment
-            )
-
-            val process = pb.start()
-            sessions.add(Session(process, executable.id))
-
-            process.inputStream.bufferedReader().forEachLine { string ->
-                Logger.debug("[CMDR] CGI process output received: $string")
-                val s = "${Calendar.getInstance().time}: $string"
-                logBuilder.appendLine(s)
-                launch { channel.send(string) }
-            }
-
-            process.errorStream.bufferedReader().forEachLine { string ->
-                Logger.debug("[CMDR] CGI process error received: $string")
-                val s = "${Calendar.getInstance().time}: $string"
-                logBuilder.appendLine(s)
-                launch { channel.send(string) }
-            }
-
-            val exitVal = process.waitFor()
-            val s = "Subprocess exited with code: $exitVal"
-            Logger.debug(s)
-            logBuilder.appendLine("\n${Calendar.getInstance().time}: $s")
-            return@withContext
-        } catch (e: Exception) {
-            val s = "Subprocess exited with error: ${e.localizedMessage}"
-            Logger.error(e)
-            val c = "\n${Calendar.getInstance().time}: $s"
-            logBuilder.appendLine(c)
-        } finally {
-            val name = getProgramName(executable)
-            Logger.logToFile(
-                text = logBuilder.toString(),
-                userArgs,
-                directory = wdp,
-                commandId = executable.id.toString(),
-                name = name
-            )
-            endSession(executable)
-            channel.close()
-            endSession(executable)
-        }
-    }
-
-    /**
      * Monitors I/O from a given subprocess via redirection and publishes both
      * output (process STDIN) and errors (process STDERR) to Rx observers while
      * also logging to file per command on the runtime host
@@ -386,7 +234,7 @@ class Commander {
             )
 
             val process = pb.start()
-            sessions.add(Session(process, executable.id))
+            addSubprocessSession(executable.callerKey, process)
 
             process.inputStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] Subprocess output received: $string")
@@ -416,10 +264,10 @@ class Commander {
                 lb.toString(),
                 userArgs,
                 wdp,
-                executable.id.toString(),
+                executable.callerKey.toString(),
                 name
             )
-            endSession(executable)
+            endSession(executable.callerKey)
         }
     }
 
@@ -427,7 +275,7 @@ class Commander {
         commandPath: String,
         args: List<String>,
         workingDir: String,
-        pid: Int,
+        callerKey: String,
         env: MutableMap<String, String> = mutableMapOf(),
         outputPublisher: BehaviorProcessor<String>,
         retainConfigEnvironment: Boolean = true
@@ -447,7 +295,7 @@ class Commander {
                 retainConfigEnvironment = retainConfigEnvironment
             )
             val process = pb.start()
-            sessions.add(Session(process, pid))
+            addSubprocessSession(key = callerKey, process = process)
 
             process.inputStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] Subprocess output received: $string")
@@ -479,7 +327,7 @@ class Commander {
                 commandId = "N/A",
                 name = commandPath
             )
-            endSession(pid)
+            endSession(callerKey)
         }
     }
 
@@ -514,7 +362,7 @@ class Commander {
                 retainConfigEnvironment = retainConfigEnvironment
             )
             val process = pb.start()
-            sessions.add(Session(process, executable.id))
+            addSubprocessSession(executable.callerKey, process)
 
             // background job for accepting input and writing to subproc STDIN
             receiverScope.launch {
@@ -564,10 +412,10 @@ class Commander {
                 lb.toString(),
                 userArgs,
                 wdp,
-                executable.id.toString(),
+                executable.callerKey.toString(),
                 name
             )
-            endSession(executable)
+            endSession(executable.callerKey)
         }
     }
 
@@ -579,7 +427,7 @@ class Commander {
      * @param programPath path to command, ex. /bin/python
      * @param args command arguments, with alias at index 0 if needed
      * @param workingDir working directory from which to execute command
-     * @param pid manually-determined process ID (sovereign of Unix PID)
+     * @param callerKey caller ID key
      * @param env any environment variables to be added to [ProcessBuilder]
      * @param inputPublisher input route for subprocess STDIN
      * @param outputPublisher output route for subprocess STDOUT
@@ -590,7 +438,7 @@ class Commander {
         programPath: String,
         args: List<String>,
         workingDir: String,
-        pid: Int,
+        callerKey: String,
         env: MutableMap<String, String> = mutableMapOf(),
         inputPublisher: BehaviorProcessor<String>,
         outputPublisher: BehaviorProcessor<String>,
@@ -612,7 +460,7 @@ class Commander {
                 retainConfigEnvironment = retainConfigEnvironment
             )
             val process = pb.start()
-            sessions.add(Session(process, pid))
+            addSubprocessSession(callerKey, process)
 
             // background job for accepting input and writing to subproc STDIN
             receiverScope.launch {
@@ -665,142 +513,7 @@ class Commander {
                 name = programPath,
                 directory = workingDir
             )
-            endSession(pid)
-        }
-    }
-
-    /**
-     * Spawns a watch service loop that can be used to continuously monitor a
-     * given path on the host system for file changes
-     *
-     * @param executable subprocess command object
-     * @param args full list of command arguments
-     * @param watchDirectory directory to be watched for file changes
-     * @param outputPublisher output route for subprocess STDOUT
-     * @param channel input channel for external loop control
-     */
-    @VisibleForTesting
-    @Throws
-    // FIXME: see note for executeFileWatcher
-    fun spawnWatcherCycle(
-        executable: ISubprocess,
-        args: List<String>,
-        env: MutableMap<String, String> = mutableMapOf(),
-        watchDirectory: String,
-        outputPublisher: BehaviorProcessor<String>,
-        channel: Channel<Int>,
-    ) {
-        var hold = true
-        GlobalScope.launch {
-            channel.consumeAsFlow().collect {
-                Logger.debug("Control channel signal received: $it")
-                hold = false
-            }
-        }
-
-        while (hold) {
-            executeFileWatcher(
-                executable,
-                args,
-                env,
-                watchDirectory,
-                outputPublisher,
-            )
-        }
-
-        endSession(executable)
-    }
-
-    /**
-     * Spawns an async file watch service that grabs input created by the QR
-     * scanner hardware, and reports it to the observer on subproc conclusion;
-     * this method DOES NOT work in the same way as [executeRx]; rather,
-     * it works identically to [collectAsync] in that the flow is cold,
-     * and it will only return values when the subprocess exits; in other words,
-     * this is NOT a continuous monitor, and it needs to be re-initiated after
-     * each read; to use this functionality as a continuous service, use
-     * [spawnWatcherCycle]
-     *
-     * @param executable subprocess command object
-     * @param userArgs full list of command arguments
-     * @param watchDirectory directory to be watched for file changes
-     * @param outputPublisher output route for subprocess STDOUT
-     */
-    @VisibleForTesting
-    // FIXME: this needs tweaked per the most recent changes to all other
-    //  functions here that now accommodate buffered signals from STD; i.e.,
-    //  change from spawning a single instance in cycle to spawning a single
-    //  cycle via only one subprocess execution
-    fun executeFileWatcher(
-        executable: ISubprocess,
-        userArgs: List<String>,
-        env: MutableMap<String, String> = mutableMapOf(),
-        watchDirectory: String,
-        outputPublisher: BehaviorProcessor<String>,
-    ) {
-        val logBuilder = StringBuilder()
-        val args = buildArguments(executable, userArgs)
-        val wdp = getWorkingDirectoryPath(executable)
-        try {
-            val pb = buildProcess(
-                workingDir = wdp,
-                args = args,
-                env = env,
-                redirectInput = true,
-                redirectError = true
-            )
-
-            val process = pb.start()
-            sessions.add(Session(process, executable.id))
-
-            val watchService = FileSystems.getDefault().newWatchService()
-            val watchPath = File(watchDirectory).toPath()
-            val keys = watchPath.register(
-                watchService,
-                StandardWatchEventKinds.ENTRY_CREATE,
-                StandardWatchEventKinds.ENTRY_MODIFY
-            )
-            val watchKey = watchService.take()
-
-            var s = ""
-            watchKey.pollEvents().first().let {
-                val fileDir = "$watchDirectory/${it.context()}"
-                val f = File(fileDir)
-                f.deleteOnExit()
-                f.reader().forEachLine { str ->
-                    Logger.debug("[CMDR] Watch service output received: $str")
-                    val out = "${Calendar.getInstance().time}: $str"
-                    logBuilder.appendLine(out)
-                    s += str
-                }
-            }
-            watchKey.reset()
-            watchKey.cancel()
-            watchService.close()
-            keys.cancel()
-            val exitVal = process.waitFor()
-            outputPublisher.onNext(s)
-
-            val str = "\nSubprocess exited with code: $exitVal"
-            Logger.debug(str)
-            logBuilder.appendLine(str)
-            outputPublisher.onComplete()
-        } catch (e: Exception) {
-            val s = "Subprocess exited with error: ${e.localizedMessage}"
-            val c = Calendar.getInstance().time
-            Logger.error(s)
-            logBuilder.appendLine("\n${c}: $s")
-            outputPublisher.onError(e)
-        } finally {
-            val name = getProgramName(executable)
-            Logger.logToFile(
-                logBuilder.toString(),
-                userArgs,
-                wdp,
-                executable.id.toString(),
-                name
-            )
-            endSession(executable)
+            endSession(callerKey)
         }
     }
 
@@ -811,12 +524,14 @@ class Commander {
      * @param watchDirectory directory to watch for changes
      * @param outputPublisher Rx publisher for output to caller
      * @param killChannel coroutines channel for killing the watcher process, when needed
+     * @param receiverScope coroutine scope given by receiver, if needed; defaults to [GlobalScope]
      * @param echoContents whether to echo the contents of the file to the caller
      */
     fun spawnFileWatch(
         watchDirectory: String,
         outputPublisher: BehaviorProcessor<String>,
         killChannel: Channel<Int>,
+        receiverScope: CoroutineScope = GlobalScope,
         echoContents: Boolean = true
     ) {
         val logBuilder = StringBuilder()
@@ -831,7 +546,7 @@ class Commander {
             )
             val watchKey = watchService.take()
             var hold = true
-            GlobalScope.launch {
+            receiverScope.launch {
                 // job to watch caller's channel for kill signal
                 val inputJob = async {
                     Logger.debug("File watch kill channel launched...")
@@ -852,6 +567,7 @@ class Commander {
                         val s = StringBuilder()
                         when (kind) {
                             StandardWatchEventKinds.ENTRY_CREATE -> {
+                                // TODO: pass lambdas for handling events here
                                 Logger.debug("[CMDR] File created at: $fileDir")
                                 if (echoContents) {
                                     val f = File(fileDir)
@@ -864,9 +580,11 @@ class Commander {
                                 }
                             }
                             StandardWatchEventKinds.ENTRY_DELETE -> {
+                                // TODO: pass lambdas for handling events here
                                 Logger.debug("[CMDR] File deleted at: $fileDir")
                             }
                             StandardWatchEventKinds.ENTRY_MODIFY -> {
+                                // TODO: pass lambdas for handling events here
                                 Logger.debug("[CMDR] File modified at: $fileDir")
                             }
                             else -> Logger.debug("Unhandled event: $kind - $context")
@@ -896,17 +614,29 @@ class Commander {
         }
     }
 
+    fun endSession(callerKey: String, forcible: Boolean = false) {
+        try {
+            procMap[callerKey]?.let { procs ->
+                procs.forEach {
+                    Logger.debug("Terminating subprocess with ID: ${it.pid()}")
+                    if (forcible) it.destroyForcibly()
+                    else it.destroy()
+                }
+                procMap.remove(callerKey)
+                Logger.debug("Session ended for caller: $callerKey")
+            } ?: kotlin.run {
+                Logger.error("Error ending session for caller $callerKey: session not found")
+            }
+        } catch (e: Exception) { Logger.error(e) }
+    }
+
     /**
      * Forcibly destroys any laggard processes; not intended for graceful
      * termination, which should be handled by [endSession]
      */
     fun killAll() {
-        sessions.forEach {
-            it.process.destroyForcibly()
-            val pid = it.process.pid()
-            Logger.debug("Subprocess destroyed forcibly with PID: $pid")
-        }
-        sessions.clear()
+        procMap.forEach { endSession(callerKey = it.key, forcible = true) }
+        procMap.clear()
     }
 
     //endregion
@@ -959,30 +689,6 @@ class Commander {
             Logger.debug("Subprocess working directory: $s")
             s
         }
-    }
-
-    /**
-     * Ends a known session by destroying the JVM subprocess by ID
-     *
-     * @param ex subprocess to cross-reference the session ID from
-     */
-    private fun endSession(ex: ISubprocess) {
-        val ended = sessions.first { s -> ex.id == s.subprocessId }
-        val pid = ended.process.pid()
-        endSession(pid.toInt())
-    }
-
-
-    private fun endSession(pid: Int) {
-        try {
-            val ended = sessions.first { s -> pid == s.subprocessId }
-            ended.process.destroy()
-            sessions.remove(ended)
-            val s =
-                "Subprocess terminated\n\tID: $pid\n\tTAG: N/A (Explicit " +
-                        "execution)\n"
-            Logger.debug(s)
-        } catch (e: Exception) { Logger.error(e) }
     }
     /**
      * Modular function for building a process for all types of sessions
@@ -1047,6 +753,19 @@ class Commander {
             add(path)
             addAll(argsList)
             this.filter { it.isNotBlank() }
+        }
+    }
+
+    private fun addSubprocessSession(key: String, process: Process) {
+        procMap[key]?.let { procs ->
+            if (procs.contains(process).not()) {
+                procs.add(process)
+                Logger.debug("New process added to caller $key: ${process.pid()}")
+            } else Logger.debug("Ignoring duplicate process for caller $key: ${process.pid()}")
+        } ?: kotlin.run {
+            procMap.put(key, arrayListOf(process))
+            Logger.debug("New session created for caller: $key " +
+                    "\n\tPID: (${process.pid()})")
         }
     }
 

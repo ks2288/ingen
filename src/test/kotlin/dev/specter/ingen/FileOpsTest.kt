@@ -59,6 +59,7 @@ class FileOpsTest {
             )
         val channel: Channel<Int> = Channel()
 
+        // spawn a thread for the file watcher; necessary for real-time (hot) flow of data
         thread {
             commander.spawnFileWatch(
                 watchDirectory = wd,
@@ -67,16 +68,20 @@ class FileOpsTest {
             )
         }
 
+        // block main thread and run test scenario with separate subprocess
         runTest {
             commander.executeExplicitRx(
                 commandPath = PYTHON_PATH,
                 args = listOf(TEST_FILE_WRITER_PATH, "${TestConstants.TEST_MODULE_DIR}/fw"),
                 workingDir = IngenConfig.INGEN_DEFAULT_DIR,
-                pid = 101010,
+                callerKey = "101010",
                 outputPublisher = fwPublisher
             )
+            // allow a bit of time for thread ops to maintain/get to good state
             delay(5000)
+            // assert after delay (currently just checking for callback ability)
             assert(out.isNotEmpty())
+            // send the SIG_KILL to the kill channel to break the threaded method's loop
             channel.send(CommandConstants.SIG_KILL.toInt())
         }
     }

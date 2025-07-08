@@ -10,8 +10,6 @@ import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -20,6 +18,7 @@ import kotlin.concurrent.thread
 import kotlin.test.fail
 
 class CommandExecutionTest {
+    var idGenCount = 0
     private lateinit var commander: Commander
     private lateinit var outputPublisher: BehaviorProcessor<String>
     private lateinit var inputPublisher: BehaviorProcessor<String>
@@ -71,9 +70,10 @@ class CommandExecutionTest {
             description = "test command using /bin/echo"
         )
         val echoCmd = Subprocess(
-            id = 1,
-            command = nc
+            callerKey = "111",
+            command = nc,
         )
+        idGenCount += 1
 
         // trim end to remove newline
         val out = commander.execute(echoCmd, userArgs).trimEnd()
@@ -90,8 +90,9 @@ class CommandExecutionTest {
     fun test_execute_rx() {
         val exec = Subprocess(
             command = mockAsyncCommandRx,
-            id = 0
+            callerKey = "112",
         )
+        idGenCount += 1
         val out = arrayListOf<String>()
 
         outputPublisher
@@ -103,6 +104,7 @@ class CommandExecutionTest {
                     out.add(it)
                 },
                 onError = {
+                    commander.killAll()
                     fail()
                 },
                 onComplete = {}
@@ -130,25 +132,30 @@ class CommandExecutionTest {
         val out = arrayListOf<String>()
         val op = BehaviorProcessor.create<String>()
 
-        op.toObservable()
-            .toFlowable(BackpressureStrategy.BUFFER)
-            .subscribeBy(
-                onNext = {
-                    println("Test output received: $it")
-                    out.add(it)
-                },
-                onError = { fail("Explicit RX test error...") }
-            )
+        thread {
+            op.toObservable()
+                .toFlowable(BackpressureStrategy.BUFFER)
+                .subscribeBy(
+                    onNext = {
+                        println("Test output received: $it")
+                        out.add(it)
+                    },
+                    onError = {
+                        commander.killAll()
+                        fail("Explicit RX test error...")
+                    }
+                )
+        }
 
         commander.executeExplicitRx(
             commandPath = PYTHON_PATH,
             args = listOf(EXPLICIT_RX_SCRIPT_PATH),
             workingDir = IngenConfig.INGEN_DEFAULT_DIR,
-            pid = 101010,
+            callerKey = "101010",
             outputPublisher = op
         )
 
-        runTest { assert(out.size == EXPECTED_EXPLICIT_RX_RESULTS_SIZE) }
+        assert(out.size == EXPECTED_EXPLICIT_RX_RESULTS_SIZE)
     }
 
     /**
@@ -161,24 +168,29 @@ class CommandExecutionTest {
         val op = BehaviorProcessor.create<String>()
 
         op.toObservable()
-            .toFlowable(BackpressureStrategy.BUFFER)
+            .toFlowable(BackpressureStrategy.LATEST)
             .subscribeBy(
                 onNext = {
                     println("Test output received: $it")
                     out.add(it)
                 },
-                onError = { fail("Explicit RX test error...") }
+                onError = {
+                    commander.killAll()
+                    fail("Explicit RX test error...")
+                }
             )
 
-        commander.executeExplicitRx(
-            commandPath = PYTHON_PATH,
-            args = listOf(EXPLICIT_RX_SCRIPT_PATH2),
-            workingDir = IngenConfig.INGEN_DEFAULT_DIR,
-            pid = 101010,
-            outputPublisher = op
-        )
-
-        runTest { assert(out.size == EXPECTED_EXPLICIT_RX_RESULTS_SIZE) }
+        runTest {
+            commander.executeExplicitRx(
+                commandPath = PYTHON_PATH,
+                args = listOf(EXPLICIT_RX_SCRIPT_PATH2),
+                workingDir = IngenConfig.INGEN_DEFAULT_DIR,
+                callerKey = "101010",
+                outputPublisher = op
+            )
+//            delay(3000)
+            assert(out.size == EXPECTED_EXPLICIT_RX_RESULTS_SIZE)
+        }
     }
 
     // Test interactive subprocess management, specific to a Python subprocess
@@ -198,6 +210,7 @@ class CommandExecutionTest {
                     out.add(it)
                 },
                 onError = {
+                    commander.killAll()
                     fail(("Flowable test error: ${it.localizedMessage}"))
                 }
             )
@@ -218,18 +231,11 @@ class CommandExecutionTest {
                 programPath = PYTHON_PATH,
                 args = listOf(INTERACTIVE_MODULE_PATH),
                 workingDir = IngenConfig.INGEN_DEFAULT_DIR,
-                pid = 10001,
+                callerKey = "10001",
                 inputPublisher = ip,
                 outputPublisher = op
             )
-//            commander.monitorControlChannel(
-//                args = INPUT_TEST_ARGS,
-//                directory = TEST_DIR,
-//                inputPublisher = ip,
-//                outputPublisher = op
-//            )
         }
-
         // start job after subprocess is launched
         job.start()
 
@@ -241,62 +247,10 @@ class CommandExecutionTest {
         }
     }
 
-    @Test
-    fun test_execute_channel_flow() {
-        runTest {
-            val out = arrayListOf<String>()
-            val sp = Subprocess(
-                id = 2,
-                command = mockAsyncCommandCoroutines
-            )
-
-            commander.executeChannelFlow(
-                executable = sp,
-                userArgs = listOf(),
-            ).collect {
-                println("Callback flow collected: $it")
-                out.add(it)
-            }
-
-            assert(out.size == EXPECTED_COROUTINES_RESULTS_SIZE)
-        }
-    }
-
-    @Test
-    fun test_execute_async() {
-        val channel = Channel<String>()
-        val out = arrayListOf<String>()
-        val sp = Subprocess(
-            id = 3,
-            command = mockAsyncCommandCoroutines
-        )
-        runTest {
-            launch {
-                commander.collectAsync(
-                    executable = sp,
-                    userArgs = listOf(),
-                    channel = channel
-                )
-            }
-
-            val job = async {
-                channel.consumeAsFlow().collect {
-                    println("consumer collected output: $it")
-                    out.add(it)
-                }
-            }
-            job.start()
-            job.await()
-
-            assert(out.size == EXPECTED_COROUTINES_RESULTS_SIZE)
-        }
-    }
-
     companion object {
         private val USER_HOME = System.getProperty("user.home")
         private const val ECHO_CONTENT = "test echo"
         private const val EXPECTED_MONITOR_OUTPUT_SIZE = 10
-        private const val EXPECTED_COROUTINES_RESULTS_SIZE = 5
         private const val ECHO_PATH = "/bin/echo"
         private val INTERACTIVE_MODULE_PATH = "${IngenConfig
             .INGEN_MODULE_DIR}/input_tester.py"

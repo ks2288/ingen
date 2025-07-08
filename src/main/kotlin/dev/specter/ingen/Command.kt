@@ -25,27 +25,15 @@ interface ICommand {
 }
 
 /**
- * Simple contract for cataloging subprocesses during runtime
- *
- * @property process native process object
- * @property sequenceNumber value for auditing the sequence of process events
- */
-interface ISession {
-    val process: Process
-    val subprocessId: Int
-    var sequenceNumber: Int
-}
-
-/**
  * Executable subprocess object schema, containing both the specific subprocess
  * command and the necessary logistical information for process management
  * purposes
  *
- * @property id unique subprocess ID for runtime logistics
+ * @property callerKey unique command ID for runtime logistics
  * @property command nested command object
  */
 interface ISubprocess {
-    val id: Int
+    val callerKey: String
     val command: ICommand
 
     /**
@@ -71,7 +59,6 @@ interface ISubprocess {
  * @property ASYNC async subprocess that accepts no user input
  * @property INTERACTIVE async subprocess that accepts user input
  */
-// TODO: create an annotation for all reflector classes etc that have a backing JSON config
 enum class ProcessType {
     POLL,
     ASYNC,
@@ -109,17 +96,8 @@ data class Command(
  */
 @Serializable
 data class Subprocess(
-    override val id: Int,
+    override val callerKey: String,
     @Serializable
     override val command: Command
 ) : ISubprocess
 
-/**
- * Concrete implementation for storing information about active subprocesses
- */
-class Session(
-    override val process: Process,
-    override val subprocessId: Int
-) : ISession {
-    override var sequenceNumber: Int = 0
-}

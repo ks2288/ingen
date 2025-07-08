@@ -102,15 +102,15 @@ object ConfigBuilder {
      */
     fun buildConfig(
         configPath: String = CommandConstants.CONFIG_FILE_PATH
-    ): IngenConfig? = try {
+    ): IngenConfig = try {
         FSHelper.getFileText(configPath)?.let { s ->
             SerializationHandler.serializableFromString(s)
         } ?: SerializationHandler
             .serializableFromString(IngenDefaults.DEFAULT_CONFIG)
-
+        ?: IngenConfig()
     } catch (e: Exception) {
         Logger.error(e)
-        null
+        IngenConfig()
     }
 
     /**
