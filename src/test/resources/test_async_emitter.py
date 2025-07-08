@@ -10,7 +10,7 @@ class Emitter:
 
     async def send(self):
         message = self.create_message()
-        print(message)
+        print(message, flush=True)
         self.count += 1
 
 

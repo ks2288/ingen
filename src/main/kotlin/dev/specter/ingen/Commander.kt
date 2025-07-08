@@ -234,7 +234,7 @@ class Commander(configuration: IngenConfig? = null) {
             )
 
             val process = pb.start()
-            addSubprocessSession(executable.callerKey, process)
+            addSubprocess(executable.callerKey, process)
 
             process.inputStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] Subprocess output received: $string")
@@ -264,13 +264,25 @@ class Commander(configuration: IngenConfig? = null) {
                 lb.toString(),
                 userArgs,
                 wdp,
-                executable.callerKey.toString(),
+                executable.callerKey,
                 name
             )
             endSession(executable.callerKey)
         }
     }
 
+    /**
+     * Executes an explicit async command, meaning it does not come from the loaded config's
+     * program/command maps
+     *
+     * @param commandPath full system path to the desired command
+     * @param args arguments to accompany the command path
+     * @param workingDir directory from which the command should be executed
+     * @param callerKey unique caller identification key
+     * @param env map of any environment variables to be added to the execution
+     * @param outputPublisher Rx publisher through which output is routed
+     * @param retainConfigEnvironment flag for config env variable retention
+     */
     fun executeExplicitRx(
         commandPath: String,
         args: List<String>,
@@ -295,7 +307,7 @@ class Commander(configuration: IngenConfig? = null) {
                 retainConfigEnvironment = retainConfigEnvironment
             )
             val process = pb.start()
-            addSubprocessSession(key = callerKey, process = process)
+            addSubprocess(key = callerKey, process = process)
 
             process.inputStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] Subprocess output received: $string")
@@ -362,7 +374,7 @@ class Commander(configuration: IngenConfig? = null) {
                 retainConfigEnvironment = retainConfigEnvironment
             )
             val process = pb.start()
-            addSubprocessSession(executable.callerKey, process)
+            addSubprocess(executable.callerKey, process)
 
             // background job for accepting input and writing to subproc STDIN
             receiverScope.launch {
@@ -460,7 +472,7 @@ class Commander(configuration: IngenConfig? = null) {
                 retainConfigEnvironment = retainConfigEnvironment
             )
             val process = pb.start()
-            addSubprocessSession(callerKey, process)
+            addSubprocess(callerKey, process)
 
             // background job for accepting input and writing to subproc STDIN
             receiverScope.launch {
@@ -614,6 +626,12 @@ class Commander(configuration: IngenConfig? = null) {
         }
     }
 
+    /**
+     * Ends all processes executed by a given caller, forcibly if desire
+     *
+     * @param callerKey unique caller identification key
+     * @param forcible flag for forcible process destruction
+     */
     fun endSession(callerKey: String, forcible: Boolean = false) {
         try {
             procMap[callerKey]?.let { procs ->
@@ -647,7 +665,7 @@ class Commander(configuration: IngenConfig? = null) {
      * Takes a path code and retrieves a command path from the config values
      *
      * @param code path code for the given command
-     * @return path of program to be executed per [IProgram.code]
+     * @return path of program to be executed per configuration file
      */
     @Throws
     private fun getCommandPath(code: Int): String =
@@ -690,6 +708,7 @@ class Commander(configuration: IngenConfig? = null) {
             s
         }
     }
+
     /**
      * Modular function for building a process for all types of sessions
      *
@@ -752,11 +771,17 @@ class Commander(configuration: IngenConfig? = null) {
         return with(arrayListOf<String>()) {
             add(path)
             addAll(argsList)
-            this.filter { it.isNotBlank() }
+            filter { it.isNotBlank() }
         }
     }
 
-    private fun addSubprocessSession(key: String, process: Process) {
+    /**
+     * Adds a new subprocess executed by a given caller to the management map
+     *
+     * @param key unique caller identification key
+     * @param process [Process] object running on the host system
+     */
+    private fun addSubprocess(key: String, process: Process) {
         procMap[key]?.let { procs ->
             if (procs.contains(process).not()) {
                 procs.add(process)

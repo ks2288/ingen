@@ -4,7 +4,7 @@ import time
 
 if __name__ == "__main__":
     if len(sys.argv) < 1:
-        print("Usage: [python exec path] test_file_writer.py [watch directory path]")
+        print("Usage: [python exec path] test_file_writer.py [watch directory path]", flush=True)
     else:
         paths = []
         dir = sys.argv[1]
@@ -19,10 +19,10 @@ if __name__ == "__main__":
                 milliseconds = int(round(seconds_since_epoch * 1000))
                 f.write(f"Current time in milliseconds: {milliseconds}\n")
             logStr = "File added to: " + dir
-            print(logStr)
+            print(logStr, flush=True)
             count += 1
             time.sleep(1)
-        print("Test files created. Cleaning up...")
+        print("Test files created. Cleaning up...", flush=True)
         for fpath in paths:
             os.remove(fpath)
-        print("Test cleanup complete!")
+        print("Test cleanup complete!", flush=True)

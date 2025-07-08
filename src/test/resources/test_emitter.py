@@ -15,7 +15,8 @@ class Emitter:
                 time.sleep(1)
                 count += 1
                 message = self.create_message([str(count)])
-                print(message)
+                print(message, flush=True)
+
             sys.exit(0)
 
     def create_message(self, content):

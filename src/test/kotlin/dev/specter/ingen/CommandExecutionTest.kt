@@ -128,24 +128,23 @@ class CommandExecutionTest {
      * subscriber as a single "batch" result
      */
     @Test
-    fun test_execute_explicit_rx_cold() {
+    fun test_execute_explicit_rx() {
         val out = arrayListOf<String>()
         val op = BehaviorProcessor.create<String>()
 
-        thread {
-            op.toObservable()
-                .toFlowable(BackpressureStrategy.BUFFER)
-                .subscribeBy(
-                    onNext = {
-                        println("Test output received: $it")
-                        out.add(it)
-                    },
-                    onError = {
-                        commander.killAll()
-                        fail("Explicit RX test error...")
-                    }
-                )
-        }
+        op.toObservable()
+            .toFlowable(BackpressureStrategy.BUFFER)
+            .subscribeBy(
+                onNext = {
+                    println("Test output received: $it")
+                    out.add(it)
+                },
+                onError = {
+                    commander.killAll()
+                    fail("Explicit RX test error...")
+                },
+                onComplete = {}
+            )
 
         commander.executeExplicitRx(
             commandPath = PYTHON_PATH,
@@ -154,6 +153,7 @@ class CommandExecutionTest {
             callerKey = "101010",
             outputPublisher = op
         )
+
 
         assert(out.size == EXPECTED_EXPLICIT_RX_RESULTS_SIZE)
     }
@@ -255,8 +255,10 @@ class CommandExecutionTest {
         private val INTERACTIVE_MODULE_PATH = "${IngenConfig
             .INGEN_MODULE_DIR}/input_tester.py"
         private const val EXPECTED_INPUT_RESULT_SIZE_PYTHON = 2
-        private val EXPLICIT_RX_SCRIPT_PATH = "${TestConstants.TEST_RES_DIR}/test_emitter.py"
-        private val EXPLICIT_RX_SCRIPT_PATH2 = "${TestConstants.TEST_RES_DIR}/test_async_emitter.py"
+        private val EXPLICIT_RX_SCRIPT_PATH =
+            "${TestConstants.TEST_RES_DIR}/test_emitter.py"
+        private val EXPLICIT_RX_SCRIPT_PATH2 =
+            "${TestConstants.TEST_RES_DIR}/test_async_emitter.py"
         private const val EXPECTED_EXPLICIT_RX_RESULTS_SIZE = 5
         val PYTHON_PATH = "$USER_HOME/.pyenv/shims/python"
     }
