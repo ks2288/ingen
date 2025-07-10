@@ -1,7 +1,7 @@
 package dev.specter.ingen.config
 
 import dev.specter.auxi.FSHelper
-import dev.specter.ingen.Subprocess
+import dev.specter.ingen.Command
 import dev.specter.ingen.config.IngenDefaults.CMD_PATH
 import dev.specter.ingen.config.IngenDefaults.CONFIG_PATH
 import dev.specter.ingen.config.IngenDefaults.MODULE_1_PATH
@@ -72,28 +72,6 @@ object ConfigBuilder {
     }
 
     /**
-     * Takes a path of a subprocess command schema, and parses the file contents
-     * into a list of subprocess command objects
-     *
-     * @param schemaPath path to file from which the JSON text will be read
-     * @return list of decoded subprocess objects
-     */
-    fun buildCommands(
-        schemaPath: String = CommandConstants.COMMAND_FILE_PATH
-    ): List<Subprocess>? = try {
-        FSHelper.getFileText(schemaPath)?.let {
-            val list = parseCommands(it)
-            with(arrayListOf<Subprocess>()) {
-                list?.forEach { sp -> add(sp) }
-                this
-            }
-        } ?: parseCommands(IngenDefaults.DEFAULT_COMMANDS)
-    } catch (e: Exception) {
-        Logger.error(e)
-        null
-    }
-
-    /**
      * Takes a path of a program path configuration JSON file, and reads/parses
      * the text into an [IngenConfig] instance
      *
@@ -114,19 +92,41 @@ object ConfigBuilder {
     }
 
     /**
+     * Takes a path of a subprocess command schema, and parses the file contents
+     * into a list of subprocess command objects
+     *
+     * @param schemaPath path to file from which the JSON text will be read
+     * @return list of decoded subprocess objects
+     */
+    fun buildCommands(
+        schemaPath: String = CommandConstants.COMMAND_FILE_PATH
+    ): List<Command>? = try {
+        FSHelper.getFileText(schemaPath)?.let {
+            val list = parseCommands(it)
+            with(arrayListOf<Command>()) {
+                list?.forEach { cmd -> add(cmd) }
+                this
+            }
+        } ?: parseCommands(IngenDefaults.DEFAULT_COMMANDS)
+    } catch (e: Exception) {
+        Logger.error(e)
+        null
+    }
+
+    /**
      * Compartmentalized method for handling the parsing of the schema file text
      * into operable subprocess objects
      *
      * @param schemaString file content as a string
      * @return list of parsed subprocess objects
      */
-    private fun parseCommands(schemaString: String): List<Subprocess>? = try {
+    private fun parseCommands(schemaString: String): List<Command>? = try {
         val cmdArray = SerializationHandler
             .parseJsonArrayFromString(schemaString)
-        with(arrayListOf<Subprocess>()) {
+        with(arrayListOf<Command>()) {
             cmdArray?.forEach {
                 SerializationHandler
-                    .serializableFromElement<Subprocess>(it)?.let { cmd ->
+                    .serializableFromElement<Command>(it)?.let { cmd ->
                         add(cmd)
                     }
             }

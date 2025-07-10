@@ -11,11 +11,8 @@ import io.reactivex.rxjava3.core.BackpressureStrategy
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import io.reactivex.rxjava3.schedulers.Schedulers
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -37,9 +34,11 @@ class FileOpsTest {
 
     @After
     fun teardown() {
-        GlobalScope.launch {
-            delay(5000)
-            commander.killAll()
+        runBlocking {
+            GlobalScope.async {
+                delay(5000)
+                commander.killAll()
+            }.await()
         }
     }
 
@@ -47,7 +46,9 @@ class FileOpsTest {
     fun test_file_watcher_async() {
         val out = arrayListOf<String>()
         val wd = "${TestConstants.TEST_MODULE_DIR}/fw"
-        fwPublisher.toObservable().toFlowable(BackpressureStrategy.BUFFER)
+        fwPublisher
+            .toObservable()
+            .toFlowable(BackpressureStrategy.BUFFER)
             .observeOn(Schedulers.io())
             .subscribeBy(
                 onNext = {

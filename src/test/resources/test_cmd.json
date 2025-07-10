@@ -1,6 +1,6 @@
 [
   {
-    "id": 0,
+    "uid": 0,
     "command": {
       "pcode": 2,
       "tcode": 0,
@@ -11,7 +11,7 @@
     }
   },
   {
-    "id": 1,
+    "uid": 1,
     "command": {
       "pcode": 3,
       "tcode": 2,
@@ -22,7 +22,7 @@
     }
   },
   {
-    "id": 2,
+    "uid": 2,
     "command": {
       "pcode": 0,
       "tcode": 1,
@@ -33,7 +33,7 @@
     }
   },
   {
-    "id": 3,
+    "uid": 3,
     "command": {
       "pcode": 3,
       "tcode": 1,

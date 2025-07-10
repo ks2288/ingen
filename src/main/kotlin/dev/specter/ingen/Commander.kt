@@ -65,6 +65,7 @@ class Commander(configuration: IngenConfig? = null) {
      * @return text of process's stdout
      */
     fun execute(
+        callerKey: String,
         executable: ISubprocess,
         userArgs: List<String>,
         env: MutableMap<String, String> = mutableMapOf(),
@@ -117,11 +118,11 @@ class Commander(configuration: IngenConfig? = null) {
         } finally {
             val name = getProgramName(executable)
             Logger.logToFile(
-                logBuilder.toString(),
+                text = logBuilder.toString(),
                 userArgs,
-                wdp,
-                executable.callerKey.toString(),
-                name
+                directory = wdp,
+                commandId = callerKey,
+                name = name
             )
         }
         return outputBuilder.toString()
@@ -138,6 +139,7 @@ class Commander(configuration: IngenConfig? = null) {
      * @return text of process's stdout
      */
     fun executeExplicit(
+        callerKey: String,
         commandPath: String,
         args: List<String>,
         env: MutableMap<String, String> = mutableMapOf(),
@@ -214,6 +216,7 @@ class Commander(configuration: IngenConfig? = null) {
      * @param outputPublisher output route for subprocess STDOUT
      */
     fun executeRx(
+        callerKey: String,
         executable: ISubprocess,
         userArgs: List<String>,
         env: MutableMap<String, String> = mutableMapOf(),
@@ -234,7 +237,7 @@ class Commander(configuration: IngenConfig? = null) {
             )
 
             val process = pb.start()
-            addSubprocess(executable.callerKey, process)
+            addSubprocess(callerKey, process)
 
             process.inputStream.bufferedReader().forEachLine { string ->
                 Logger.debug("[CMDR] Subprocess output received: $string")
@@ -264,10 +267,10 @@ class Commander(configuration: IngenConfig? = null) {
                 lb.toString(),
                 userArgs,
                 wdp,
-                executable.callerKey,
+                callerKey,
                 name
             )
-            endSession(executable.callerKey)
+            endSession(callerKey)
         }
     }
 
@@ -284,10 +287,10 @@ class Commander(configuration: IngenConfig? = null) {
      * @param retainConfigEnvironment flag for config env variable retention
      */
     fun executeExplicitRx(
+        callerKey: String,
         commandPath: String,
         args: List<String>,
         workingDir: String,
-        callerKey: String,
         env: MutableMap<String, String> = mutableMapOf(),
         outputPublisher: BehaviorProcessor<String>,
         retainConfigEnvironment: Boolean = true
@@ -355,6 +358,7 @@ class Commander(configuration: IngenConfig? = null) {
      * @param receiverScope coroutine scope of caller
      */
     fun executeInteractive(
+        callerKey: String,
         executable: ISubprocess,
         userArgs: List<String>,
         env: MutableMap<String, String> = mutableMapOf(),
@@ -374,7 +378,7 @@ class Commander(configuration: IngenConfig? = null) {
                 retainConfigEnvironment = retainConfigEnvironment
             )
             val process = pb.start()
-            addSubprocess(executable.callerKey, process)
+            addSubprocess(callerKey, process)
 
             // background job for accepting input and writing to subproc STDIN
             receiverScope.launch {
@@ -383,7 +387,7 @@ class Commander(configuration: IngenConfig? = null) {
                         process.outputStream.close()
                         process.inputStream.close()
                         process.errorStream.close()
-                        process.destroyForcibly()
+                        process.destroy()
                     }
                     Logger.debug("Input queued: $sig")
                     with(process.outputStream.bufferedWriter()) {
@@ -424,10 +428,10 @@ class Commander(configuration: IngenConfig? = null) {
                 lb.toString(),
                 userArgs,
                 wdp,
-                executable.callerKey.toString(),
+                callerKey.toString(),
                 name
             )
-            endSession(executable.callerKey)
+            endSession(callerKey)
         }
     }
 
@@ -447,10 +451,10 @@ class Commander(configuration: IngenConfig? = null) {
      * @param retainConfigEnvironment retain all env variables from config
      */
     fun executeExplicitInteractive(
+        callerKey: String,
         programPath: String,
         args: List<String>,
         workingDir: String,
-        callerKey: String,
         env: MutableMap<String, String> = mutableMapOf(),
         inputPublisher: BehaviorProcessor<String>,
         outputPublisher: BehaviorProcessor<String>,

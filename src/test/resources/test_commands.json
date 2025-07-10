@@ -1,0 +1,34 @@
+[
+  {
+    "pcode": 2,
+    "tcode": 0,
+    "alias": "",
+    "dir": "",
+    "esc": null,
+    "desc": "TEST"
+  },
+  {
+    "pcode": 3,
+    "tcode": 2,
+    "alias": "module/input_test.py",
+    "dir": "",
+    "escape": "xx",
+    "desc": "TEST"
+  },
+  {
+    "pcode": 0,
+    "tcode": 1,
+    "alias": "module/async_echo.sh",
+    "dir": "",
+    "esc": "",
+    "desc": "TEST"
+  },
+  {
+    "pcode": 3,
+    "tcode": 1,
+    "alias": "module/async_echo.py",
+    "dir": "",
+    "esc": "",
+    "desc": "TEST"
+  }
+]

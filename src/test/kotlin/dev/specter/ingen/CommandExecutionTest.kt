@@ -33,7 +33,7 @@ class CommandExecutionTest {
         inputPublisher = BehaviorProcessor.create()
 
         mockAsyncCommandRx = Command(
-            programAlias = TestConstants.ASYNC_SHELL_SCRIPT_PATH,
+            fileAlias = TestConstants.ASYNC_SHELL_SCRIPT_PATH,
             directory = "",
             typeCode = ProcessType.ASYNC.ordinal,
             programCode = 0,
@@ -41,7 +41,7 @@ class CommandExecutionTest {
         )
 
         mockAsyncCommandCoroutines = Command(
-            programAlias = TestConstants.ASYNC_PYTHON_SCRIPT_PATH,
+            fileAlias = TestConstants.ASYNC_PYTHON_SCRIPT_PATH,
             directory = "",
             typeCode = ProcessType.ASYNC.ordinal,
             programCode = 3,
@@ -51,11 +51,13 @@ class CommandExecutionTest {
 
     @After
     fun teardown() {
-        GlobalScope.launch {
-            // we delay to avoid thread-based race conditions, allowing all
-            // subprocess cleanup to take place before they are killed
-            delay(5000)
-            commander.killAll()
+        runBlocking {
+            GlobalScope.async {
+                // we delay to avoid thread-based race conditions, allowing all
+                // subprocess cleanup to take place before they are killed
+                delay(5000)
+                commander.killAll()
+            }.await()
         }
     }
 
@@ -63,26 +65,34 @@ class CommandExecutionTest {
     fun test_poll_exec() {
         val userArgs = listOf(ECHO_CONTENT)
         val nc = Command(
-            programAlias = "",
+            fileAlias = "",
             directory = "",
             typeCode = ProcessType.POLL.ordinal,
             programCode = 2,
             description = "test command using /bin/echo"
         )
         val echoCmd = Subprocess(
-            callerKey = "111",
+            uid = "111",
             command = nc,
         )
         idGenCount += 1
 
         // trim end to remove newline
-        val out = commander.execute(echoCmd, userArgs).trimEnd()
+        val out = commander.execute(
+            callerKey = "1234",
+            executable = echoCmd,
+            userArgs = userArgs
+        ).trimEnd()
         assert(out == ECHO_CONTENT)
     }
 
     @Test
     fun test_poll_exec_explicit() {
-        val out = commander.executeExplicit(ECHO_PATH, listOf(ECHO_CONTENT)).trimEnd()
+        val out = commander.executeExplicit(
+            callerKey = "1234",
+            commandPath = ECHO_PATH,
+            args = listOf(ECHO_CONTENT)
+        ).trimEnd()
         assert(out == ECHO_CONTENT)
     }
 
@@ -90,7 +100,7 @@ class CommandExecutionTest {
     fun test_execute_rx() {
         val exec = Subprocess(
             command = mockAsyncCommandRx,
-            callerKey = "112",
+            uid = "112",
         )
         idGenCount += 1
         val out = arrayListOf<String>()
@@ -111,6 +121,7 @@ class CommandExecutionTest {
             )
 
         commander.executeRx(
+            callerKey = "1234",
             executable = exec,
             userArgs = listOf(),
             outputPublisher = outputPublisher
@@ -154,7 +165,6 @@ class CommandExecutionTest {
             outputPublisher = op
         )
 
-
         assert(out.size == EXPECTED_EXPLICIT_RX_RESULTS_SIZE)
     }
 
@@ -188,7 +198,6 @@ class CommandExecutionTest {
                 callerKey = "101010",
                 outputPublisher = op
             )
-//            delay(3000)
             assert(out.size == EXPECTED_EXPLICIT_RX_RESULTS_SIZE)
         }
     }

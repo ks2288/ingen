@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * @property programCode ordinal path code of referenced program
  * @property typeCode ordinal path code of referenced program
  * @property directory working directory for command
- * @property programAlias name of helper/script files, i.e., `runner.py`
+ * @property fileAlias name of helper/script files, i.e., `runner.py` or `some_script.sh`
  * @property escapeSequence key sequence for signaling process termination
  * @property description brief explanation of referenced command
  *
@@ -18,7 +18,7 @@ import kotlinx.serialization.Serializable
 interface ICommand {
     val programCode: Int
     val typeCode: Int
-    val programAlias: String
+    val fileAlias: String
     val directory: String
     val escapeSequence: String?
     val description: String
@@ -29,11 +29,11 @@ interface ICommand {
  * command and the necessary logistical information for process management
  * purposes
  *
- * @property callerKey unique command ID for runtime logistics
+ * @property uid unique command ID for runtime logistics
  * @property command nested command object
  */
 interface ISubprocess {
-    val callerKey: String
+    val uid: String
     val command: ICommand
 
     /**
@@ -45,7 +45,7 @@ interface ISubprocess {
      */
     fun toArgsList(userArgs: List<String>): List<String> {
         return with(arrayListOf<String>()) {
-            add(command.programAlias)
+            add(command.fileAlias)
             addAll(userArgs)
             filter { it.isNotBlank() }
         }
@@ -78,7 +78,7 @@ data class Command(
     @SerialName("tcode")
     override val typeCode: Int,
     @SerialName("alias")
-    override val programAlias: String,
+    override val fileAlias: String,
     @SerialName("dir")
     override val directory: String,
     @SerialName("esc")
@@ -96,7 +96,7 @@ data class Command(
  */
 @Serializable
 data class Subprocess(
-    override val callerKey: String,
+    override val uid: String,
     @Serializable
     override val command: Command
 ) : ISubprocess
