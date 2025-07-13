@@ -96,6 +96,17 @@ class CommandExecutionTest {
         assert(out == ECHO_CONTENT)
     }
 
+    /**
+     * These types of Rx tests represent "hot" Rx flowables, but the designation between "hot" and "cold"
+     * depends upon whether the subprocess feeding output to this library buffers its own STDOUT; i.e., if
+     * executing a shell script, the buffer will be auto-flushed with each write to STDOUT (echo etc.); however,
+     * languages and frameworks that DO NOT auto-flush their STDOUT ops must have them manually flushed
+     * within that code written in the secondary language; for example, all Python scripts executed within
+     * Ingen, unless otherwise configured, MUST pass the "True" flag in their own code as the second argument
+     * to each call - print(..., flush=True); otherwise, the output will only be published when a semaphore
+     * signals the end of the subprocess execution, which could span the entirety of app runtime in service-oriented
+     * subprocesses
+     */
     @Test
     fun test_execute_rx() {
         val exec = Subprocess(
@@ -130,14 +141,6 @@ class CommandExecutionTest {
         runTest { assert(out.size == EXPECTED_MONITOR_OUTPUT_SIZE) }
     }
 
-    /**
-     * This test represents a "cold" subprocess - aka, one that is NOT wrapped within some kind of async
-     * framework at its own language level (i.e., asyncIO for Python); irrespective of the thread management/scheduling
-     * at the Kotlin level, these types of subprocesses will NOT return a hot flow that is accessible on-demand; that
-     * said, the behavior processor will NOT act as a traditional cold flow, wherein the subprocess gets re-executed
-     * on each subscription; in such a case, the subprocess will need to exit before the results can be accessed by the
-     * subscriber as a single "batch" result
-     */
     @Test
     fun test_execute_explicit_rx() {
         val out = arrayListOf<String>()
