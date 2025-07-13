@@ -121,7 +121,9 @@ class Commander(configuration: IngenConfig? = null) {
                 text = logBuilder.toString(),
                 userArgs,
                 directory = wdp,
-                commandId = callerKey,
+                callerKey = callerKey,
+                uid = executable.uid,
+                cmdCode = executable.command.programCode,
                 name = name
             )
         }
@@ -199,7 +201,9 @@ class Commander(configuration: IngenConfig? = null) {
                 text = logBuilder.toString(),
                 args = args,
                 directory = workingDir,
-                commandId = "N/A",
+                callerKey = callerKey,
+                uid = "N/A (explicit execution)",
+                cmdCode = -1,
                 name = commandPath
             )
         }
@@ -264,11 +268,13 @@ class Commander(configuration: IngenConfig? = null) {
         } finally {
             val name = getProgramName(executable)
             Logger.logToFile(
-                lb.toString(),
-                userArgs,
-                wdp,
-                callerKey,
-                name
+                text = lb.toString(),
+                args = userArgs,
+                directory = wdp,
+                callerKey = callerKey,
+                uid = executable.uid,
+                cmdCode = -1,
+                name = name
             )
             endSession(callerKey)
         }
@@ -339,7 +345,9 @@ class Commander(configuration: IngenConfig? = null) {
                 text = lb.toString(),
                 args = args,
                 directory = workingDir,
-                commandId = "N/A",
+                callerKey = callerKey,
+                uid = "N/A (explicit execution)",
+                cmdCode = -1,
                 name = commandPath
             )
             endSession(callerKey)
@@ -425,11 +433,13 @@ class Commander(configuration: IngenConfig? = null) {
         } finally {
             val name = getProgramName(executable)
             Logger.logToFile(
-                lb.toString(),
-                userArgs,
-                wdp,
-                callerKey.toString(),
-                name
+                text = lb.toString(),
+                args = userArgs,
+                directory = wdp,
+                callerKey = callerKey,
+                uid = executable.uid,
+                cmdCode = -1,
+                name = name
             )
             endSession(callerKey)
         }
@@ -523,10 +533,12 @@ class Commander(configuration: IngenConfig? = null) {
             logBuilder.appendLine("\n${Calendar.getInstance().time}: $s")
         } finally {
             Logger.logToFile(
-                logBuilder.toString(),
+                text = logBuilder.toString(),
                 args = args,
-                commandId = "N/A",
+                callerKey = callerKey,
                 name = programPath,
+                uid = "N/A (explicit execution)",
+                cmdCode = -1,
                 directory = workingDir
             )
             endSession(callerKey)
@@ -544,6 +556,7 @@ class Commander(configuration: IngenConfig? = null) {
      * @param echoContents whether to echo the contents of the file to the caller
      */
     fun spawnFileWatch(
+        callerKey: String,
         watchDirectory: String,
         outputPublisher: BehaviorProcessor<String>,
         killChannel: Channel<Int>,
@@ -617,7 +630,9 @@ class Commander(configuration: IngenConfig? = null) {
                     text = logBuilder.toString(),
                     args = listOf(),
                     directory = watchDirectory,
-                    commandId = "N/A",
+                    callerKey = callerKey,
+                    uid = "N/A (File Watch Service)",
+                    cmdCode = -1,
                     name = "File watcher"
                 )
             }

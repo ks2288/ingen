@@ -36,7 +36,7 @@ class FileOpsTest {
     fun teardown() {
         runBlocking {
             GlobalScope.async {
-                delay(5000)
+                delay(TEARDOWN_DELAY)
                 commander.killAll()
             }.await()
         }
@@ -63,6 +63,7 @@ class FileOpsTest {
         // spawn a thread for the file watcher; necessary for real-time (hot) flow of data
         thread {
             commander.spawnFileWatch(
+                callerKey = "01010",
                 watchDirectory = wd,
                 outputPublisher = fwPublisher,
                 killChannel = channel,
@@ -79,7 +80,7 @@ class FileOpsTest {
                 outputPublisher = fwPublisher
             )
             // allow a bit of time for thread ops to maintain/get to good state
-            delay(5000)
+            delay(TEARDOWN_DELAY)
             // assert after delay (currently just checking for callback ability)
             assert(out.isNotEmpty())
             // send the SIG_KILL to the kill channel to break the threaded method's loop
@@ -89,5 +90,6 @@ class FileOpsTest {
 
     companion object {
         val TEST_FILE_WRITER_PATH = "${TestConstants.TEST_RES_DIR}/test_file_writer.py"
+        const val TEARDOWN_DELAY = 3000L
     }
 }

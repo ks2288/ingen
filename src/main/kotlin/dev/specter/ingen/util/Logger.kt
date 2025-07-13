@@ -63,15 +63,18 @@ object Logger {
         text: String,
         args: List<String>,
         directory: String,
-        commandId: String,
-        name: String? = "ingen_splog"
+        callerKey: String,
+        uid: String?,
+        cmdCode: Int,
+        name: String? = "ingen_log"
     ) {
         val sb = StringBuilder()
         sb.appendLine(
             """
             Begin log for subprocess:
-                command ID: $commandId
-                command name: $name
+                caller key: $callerKey
+                subprocess UID: $uid
+                command code: $cmdCode
                 working dir: $directory
                 args:
         """.trimIndent()
@@ -87,7 +90,7 @@ object Logger {
             val file = File(
                 // TODO: combine this property with those in config
                 CommandConstants.LOG_DIR,
-                createLogFileName(logName = name ?: commandId)
+                createLogFileName(logName = name ?: callerKey)
             )
             file.bufferedWriter().use { out ->
                 out.write(sb.toString())

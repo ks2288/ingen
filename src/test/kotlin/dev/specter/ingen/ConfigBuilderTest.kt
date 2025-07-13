@@ -26,13 +26,13 @@ class ConfigBuilderTest {
     }
 
     @Test
-    fun testGenerateDefaultFiles() {
+    fun test_generate_default_files() {
         ConfigBuilder.initializeFS()
         assert(ConfigBuilder.generateDefaultFiles())
     }
 
     @Test
-    fun testBuildConfigFromFile() {
+    fun test_build_config_from_file() {
         val config = ConfigBuilder.buildConfig(TestConstants.TEST_CONFIG_FILE_PATH)
         with(config) {
             assert(runtimeDirectory == EXPECTED_TEST_STRING)
@@ -40,7 +40,7 @@ class ConfigBuilderTest {
     }
 
     @Test
-    fun testParseConfigFromDefaults() {
+    fun test_parse_config_from_defaults() {
         // intentionally give this a bad path to force default val parsing
         val config = ConfigBuilder.buildConfig("")
         assert(
