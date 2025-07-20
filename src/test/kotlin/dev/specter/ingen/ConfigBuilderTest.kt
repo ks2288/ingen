@@ -17,10 +17,10 @@ class ConfigBuilderTest {
     @Test
     fun test_build_commands() {
 
-        val commands = ConfigBuilder.buildCommands(TestConstants.TEST_COMMANDS_JSON_PATH)
+        val commands = ConfigBuilder.buildSubprocessCalls(TestConstants.TEST_COMMANDS_JSON_PATH)
         commands?.let { c ->
             c.forEach {
-                assert(it.description == EXPECTED_TEST_STRING)
+                assert(it.command.description == EXPECTED_TEST_STRING)
             }
         } ?: fail()
     }

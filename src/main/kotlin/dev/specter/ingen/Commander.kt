@@ -144,7 +144,7 @@ class Commander(configuration: IngenConfig? = null) {
         callerKey: String,
         commandPath: String,
         args: List<String>,
-        env: MutableMap<String, String> = mutableMapOf(),
+        env: Map<String, String> = mutableMapOf(),
         workingDir: String = IngenConfig.INGEN_DEFAULT_DIR,
         retainConfigEnvironment: Boolean = true
     ): String {
@@ -746,7 +746,7 @@ class Commander(configuration: IngenConfig? = null) {
     private fun buildProcess(
         workingDir: String,
         args: List<String>,
-        env: MutableMap<String, String>,
+        env: Map<String, String>,
         retainConfigEnvironment: Boolean = true,
         redirectInput: Boolean = false,
         redirectOutput: Boolean = false,
@@ -759,12 +759,13 @@ class Commander(configuration: IngenConfig? = null) {
             if (redirectOutput) redirectOutput()
             if (redirectError) redirectError()
 
+            val environment = env.toMutableMap()
             if (retainConfigEnvironment)
                 config.envVar
                     .filter { env.containsKey(it.key).not() }
-                    .forEach { v -> env[v.key] = v.value }
+                    .forEach { v -> environment[v.key] = v.value }
 
-            for (i in env)
+            for (i in environment)
                 environment()[i.key] = i.value
             directory(wdf)
             command(args)

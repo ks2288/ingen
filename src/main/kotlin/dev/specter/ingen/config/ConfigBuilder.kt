@@ -1,7 +1,8 @@
 package dev.specter.ingen.config
 
 import dev.specter.auxi.FSHelper
-import dev.specter.ingen.Command
+import dev.specter.ingen.ISubprocess
+import dev.specter.ingen.Subprocess
 import dev.specter.ingen.config.IngenDefaults.CMD_PATH
 import dev.specter.ingen.config.IngenDefaults.CONFIG_PATH
 import dev.specter.ingen.config.IngenDefaults.MODULE_1_PATH
@@ -98,16 +99,16 @@ object ConfigBuilder {
      * @param schemaPath path to file from which the JSON text will be read
      * @return list of decoded subprocess objects
      */
-    fun buildCommands(
+    fun buildSubprocessCalls(
         schemaPath: String = CommandConstants.COMMAND_FILE_PATH
-    ): List<Command>? = try {
+    ): List<ISubprocess>? = try {
         FSHelper.getFileText(schemaPath)?.let {
-            val list = parseCommands(it)
-            with(arrayListOf<Command>()) {
+            val list = parseSubprocessCalls(it)
+            with(arrayListOf<ISubprocess>()) {
                 list?.forEach { cmd -> add(cmd) }
                 this
             }
-        } ?: parseCommands(IngenDefaults.DEFAULT_COMMANDS)
+        } ?: parseSubprocessCalls(IngenDefaults.DEFAULT_COMMANDS)
     } catch (e: Exception) {
         Logger.error(e)
         null
@@ -120,14 +121,14 @@ object ConfigBuilder {
      * @param schemaString file content as a string
      * @return list of parsed subprocess objects
      */
-    private fun parseCommands(schemaString: String): List<Command>? = try {
+    private fun parseSubprocessCalls(schemaString: String): List<ISubprocess>? = try {
         val cmdArray = SerializationHandler
             .parseJsonArrayFromString(schemaString)
-        with(arrayListOf<Command>()) {
+        with(arrayListOf<ISubprocess>()) {
             cmdArray?.forEach {
                 SerializationHandler
-                    .serializableFromElement<Command>(it)?.let { cmd ->
-                        add(cmd)
+                    .serializableFromElement<Subprocess>(it)?.let { sp ->
+                        add(sp)
                     }
             }
             toList()
