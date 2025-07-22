@@ -15,7 +15,7 @@ import kotlinx.coroutines.*
  * applications, this service can manage the execution of subprocesses from multiple callers
  * from, for example, a websocket connection with the server running an app embedded with Ingen;
  * in this latter situation, there are potentially "1 to 1 or many" possible combinations of
- * callers, supported correlatively by the maximum throughput of the server
+ * callers, supported correlatively by the maximum throughput of the server and its clients
  *
  * @property config configuration object for Ingen runtime
  * @property commands list of commands parsed from the JSON commands file
@@ -156,7 +156,9 @@ interface ICommandService {
 }
 
 /**
- * Implementation of [ICommandService]
+ * Implementation of [ICommandService] to be used as a singleton within any application that implements
+ * this library; can be tested on its own (as done within this library code) or mocked via its parent \
+ * interface to support complex unit testing untethered from a native Linux system
  */
 object CommandService : ICommandService {
     override val config: IngenConfig = ConfigBuilder.buildConfig()

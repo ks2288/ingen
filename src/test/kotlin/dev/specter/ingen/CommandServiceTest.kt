@@ -17,6 +17,10 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.test.fail
 
+/**
+ * Refer to this test for understanding the usage within the context of an application that
+ * implements this library; each of the core functionalities of Ingen is tested here
+ */
 class CommandServiceTest {
     private lateinit var composite: CompositeDisposable
 
@@ -30,6 +34,20 @@ class CommandServiceTest {
         CommandService.teardown { composite.dispose() }
     }
 
+    /**
+     * This represents the core usage for async ops, carrying the following cadence:
+     *  1. create IO routes from within caller (such as a view model or its children objects etc.)
+     *  2. subscribe to output route, using a composite disposable "bucket"
+     *  3. create request using appropriate static interface method
+     *  4. execute async (suspend) function within appropriate coroutine scope (i.e. Composable `LaunchedEffect`)
+     *  5. await completion and/or handle errors, where appropriate (i.e. behavioral architectures)
+     *
+     * NOTE: the input processor need not be threaded when executing interactive
+     * subprocesses, as is demonstrated (threading) within the [CommanderTest]
+     * suite; it can just as easily be wrapped within an async coroutines job to
+     * produce the same effect, and with potentially less unexpected behavior than
+     * can come with using explicit virtual threads
+     */
     @Test
     fun test_service_execute_async() {
         val out = arrayListOf<String>()
