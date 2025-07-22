@@ -6,7 +6,7 @@ import java.nio.file.Paths
 object IngenDefaults {
     val CMD_PATH: Path = Paths.get("${IngenConfig.INGEN_CONFIG_DIR}/commands.json")
     val CONFIG_PATH: Path = Paths.get("${IngenConfig.INGEN_CONFIG_DIR}/ingen.json")
-    val MODULE_1_PATH: Path = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/input_tester.py")
+    val MODULE_1_PATH: Path = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/input_test.py")
     val MODULE_2_PATH: Path = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/async_echo.sh")
     val MODULE_3_PATH: Path = Paths.get("${IngenConfig.INGEN_MODULE_DIR}/async_echo.py")
 

@@ -6,7 +6,7 @@ import dev.specter.ingen.config.ConfigBuilder
 import dev.specter.ingen.config.IngenConfig
 import dev.specter.ingen.util.Logger
 import io.reactivex.rxjava3.processors.BehaviorProcessor
-import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.*
 
 /**
  * Contract for all service implementations managing callers and their requested subprocess
@@ -26,45 +26,38 @@ interface ICommandService {
     val config: IngenConfig
     val commands: List<ISubprocess>
     val commander: Commander
+    // TODO: change the value to an IORoute to accommodate disposing of input publishers along with output publishers
     val processorMap: MutableMap<String, ArrayList<BehaviorProcessor<String>>>
 
     /**
      * Simplest method for executing a simple, blocking FIFO call; meant for the simplest
      * and most lightweight subprocess calls
      *
-     * @param key unique caller ID key, for both cyphering data and validating subprocess calls
-     * @param code subprocess uid, corresponding to an entry within the JSON commands file
-     * @param args list of user-supplied arguments to accompany the subprocess call
-     * @param environmentVars any required supplemental environment vars
+     * @param request execution request containing all relevant information about caller and program
      * @param retainConfigEnv whether to retain the environment variables listed in the config file
      * @return subprocess output as a raw string, via STDOUT
      *
      */
     fun execute(
-        key: String,
-        code: Int,
-        args: List<String> = listOf(),
-        environmentVars: Map<String, String> = mapOf(),
+        request: IExecRequest,
         retainConfigEnv: Boolean = true
     ): String
 
     /**
      * Method for executing asynchronous subprocesses that likely carry long-running or more complex
      * operations than those launched via [execute]
-     * @param key unique caller ID key, for both cyphering data and validating subprocess calls
-     * @param code subprocess uid, corresponding to an entry within the JSON commands file
-     * @param args list of user-supplied arguments to accompany the subprocess call
-     * @param threaded whether to explicitly thread the subscription to the Rx publisher
-     * @param environmentVars any required supplemental environment vars
+     *
+     * @param request execution request containing all relevant information about caller and program
+     * @param ioRoute Rx processor pair for subprocess IO
      * @param retainConfigEnv whether to retain the environment variables listed in the config file
+     * @param scope caller's coroutine scope, if provided (defaults to [GlobalScope])
      */
-    fun executeAsync(
-        key: String,
-        code: Int,
-        args: List<String> = listOf(),
-        threaded: Boolean = false,
-        environmentVars: Map<String, String> = mapOf(),
-        retainConfigEnv: Boolean = true
+    @OptIn(DelicateCoroutinesApi::class)
+    suspend fun executeAsync(
+        request: IExecRequest,
+        ioRoute: IORoute,
+        retainConfigEnv: Boolean = true,
+        scope: CoroutineScope = GlobalScope
     )
 
     /**
@@ -72,42 +65,30 @@ interface ICommandService {
      * and most lightweight subprocess calls; using this method implies you are calling a
      * program on the native system that is NOT listed within the JSON commands file
      *
-     * @param key unique caller ID key, for both cyphering data and validating subprocess calls
-     * @param path explicit path to program
-     * @param workingDir directory path from which to launch the native program
-     * @param args list of user-supplied arguments to accompany the subprocess call
-     * @param environmentVars any required supplemental environment vars
+     * @param request execution request containing all relevant information about caller and program
      * @param retainConfigEnv whether to retain the environment variables listed in the config file
      * @return subprocess output as a raw string, via STDOUT
      *
      */
     fun executeExplicit(
-        key: String,
-        path: String,
-        workingDir: String,
-        args: List<String> = listOf(),
-        environmentVars: Map<String, String> = mapOf(),
+        request: IExecRequestExplicit,
         retainConfigEnv: Boolean = true
     ): String
 
     /**
      * Method for executing asynchronous subprocesses that are NOT contained within the JSON commands file
-     * @param key unique caller ID key, for both cyphering data and validating subprocess calls
-     * @param path explicit path to program
-     * @param workingDir directory path from which to launch the native program
-     * @param args list of user-supplied arguments to accompany the subprocess call
-     * @param threaded whether to explicitly thread the subscription to the Rx publisher
-     * @param environmentVars any required supplemental environment vars
+     *
+     * @param request execution request containing all relevant information about caller and program
+     * @param ioRoute Rx processor pair for subprocess IO
      * @param retainConfigEnv whether to retain the environment variables listed in the config file
+     * @param scope caller's coroutine scope, if provided (defaults to [GlobalScope])
      */
-    fun executeExplicitAsync(
-        key: String,
-        path: String,
-        workingDir: String,
-        args: List<String> = listOf(),
-        threaded: Boolean = false,
-        environmentVars: Map<String, String> = mapOf(),
-        retainConfigEnv: Boolean = true
+    @OptIn(DelicateCoroutinesApi::class)
+    suspend fun executeExplicitAsync(
+        request: IExecRequestExplicit,
+        ioRoute: IORoute,
+        retainConfigEnv: Boolean = true,
+        scope: CoroutineScope = GlobalScope
     )
 
     /**
@@ -163,7 +144,11 @@ interface ICommandService {
 
     /**
      * All-in-one teardown method meant for cleaning up runtime prior to app termination
-     * (or any other such situations); the most important part is the program cleanup
+     * (or any other such situations); the most important part is the program cleanup;
+     * performs three main steps:
+     *  1. destroys all native programs and catalogs the PIDs
+     *  2. "disposes" of the behavior processors' subscriptions by triggering their onComplete()
+     *  3. executes any given logic via lamba, specific to the application implementing this library
      *
      * @param postRun lamba for any other logic that needs to be run after the cleanup process
      */
@@ -176,7 +161,7 @@ interface ICommandService {
 object CommandService : ICommandService {
     override val config: IngenConfig = ConfigBuilder.buildConfig()
     override val commands: List<ISubprocess> =
-        ConfigBuilder.buildSubprocessCalls() ?: listOf()
+        ConfigBuilder.buildSubprocesses() ?: listOf()
     // TODO: pass a config property, not the whole thing
     override val commander: Commander =
         Commander(configuration = ConfigBuilder.buildConfig())
@@ -184,64 +169,120 @@ object CommandService : ICommandService {
         mutableMapOf()
 
     override fun execute(
-        key: String,
-        code: Int,
-        args: List<String>,
-        environmentVars: Map<String, String>,
+        request: IExecRequest,
         retainConfigEnv: Boolean
     ): String {
-        val sp = commands.first { it.uid.toInt() == code } as Subprocess
+        val sp = commands.first { it.uid.toInt() == request.subprocessUID } as Subprocess
         return commander.execute(
-            callerKey = key,
+            callerKey = request.callerKey,
             executable = sp,
-            userArgs = args
+            userArgs = request.userArgs,
+            env = request.envVars,
+            retainConfigEnvironment = retainConfigEnv
         )
     }
 
-    override fun executeAsync(
-        key: String,
-        code: Int,
-        args: List<String>,
-        threaded: Boolean,
-        environmentVars: Map<String, String>,
-        retainConfigEnv: Boolean
+    override suspend fun executeAsync(
+        request: IExecRequest,
+        ioRoute: IORoute,
+        retainConfigEnv: Boolean,
+        scope: CoroutineScope
     ) {
-        val sp = commands.first { it.uid.toInt() == code } as Subprocess
-        val op = BehaviorProcessor.create<String>()
-        processorMap[key]?.add(op) ?: kotlin.run {
-            processorMap.put(key, arrayListOf(op))
+        var job: Deferred<Unit>? = null
+        try {
+            val sp = commands.first { it.uid.toInt() == request.subprocessUID } as Subprocess
+            processorMap[request.callerKey]?.add(ioRoute.first) ?: kotlin.run {
+                processorMap.put(request.callerKey, arrayListOf(ioRoute.first))
+            }
+            job = scope.async {
+                ioRoute.second?.let {
+                    commander.executeInteractive(
+                        callerKey = request.callerKey,
+                        executable = sp,
+                        userArgs = request.userArgs,
+                        env = request.envVars,
+                        inputPublisher = it,
+                        outputPublisher = ioRoute.first,
+                        receiverScope = scope,
+                        retainConfigEnvironment = retainConfigEnv
+                    )
+                } ?: kotlin.run {
+                    commander.executeRx(
+                        callerKey = request.callerKey,
+                        executable = sp,
+                        userArgs = request.userArgs,
+                        env = request.envVars,
+                        outputPublisher = ioRoute.first,
+                        retainConfigEnvironment = retainConfigEnv
+                    )
+                }
+            }
+            job.start()
+            job.await()
+        } catch (e: Exception) {
+            Logger.error("Error executing async subprocess with code ${request.subprocessUID}: ${e.localizedMessage}")
+            job?.cancel("Async coroutines job failed with key: ${job.key}", e)
+            processorMap[request.callerKey]?.remove(ioRoute.first)
         }
-
     }
 
     override fun executeExplicit(
-        key: String,
-        path: String,
-        workingDir: String,
-        args: List<String>,
-        environmentVars: Map<String, String>,
+        request: IExecRequestExplicit,
         retainConfigEnv: Boolean
     ): String {
         return commander.executeExplicit(
-            callerKey = key,
-            commandPath = path,
-            args = args,
-            env = environmentVars,
-            workingDir = workingDir,
-
+            callerKey = request.callerKey,
+            commandPath = request.programPath,
+            args = request.userArgs,
+            env = request.envVars,
+            workingDir = request.workingDir,
+            retainConfigEnvironment = retainConfigEnv
         )
     }
 
-    override fun executeExplicitAsync(
-        key: String,
-        path: String,
-        workingDir: String,
-        args: List<String>,
-        threaded: Boolean,
-        environmentVars: Map<String, String>,
-        retainConfigEnv: Boolean
+    override suspend fun executeExplicitAsync(
+        request: IExecRequestExplicit,
+        ioRoute: IORoute,
+        retainConfigEnv: Boolean,
+        scope: CoroutineScope
     ) {
-        TODO("Not yet implemented")
+        var job: Deferred<Unit>? = null
+        try {
+            processorMap[request.callerKey]?.add(ioRoute.first) ?: kotlin.run {
+                processorMap.put(request.callerKey, arrayListOf(ioRoute.first))
+            }
+            job = scope.async {
+                ioRoute.second?.let {
+                    commander.executeExplicitInteractive(
+                        callerKey = request.callerKey,
+                        programPath = request.programPath,
+                        args = request.userArgs,
+                        workingDir = request.workingDir,
+                        env = request.envVars,
+                        inputPublisher = it,
+                        outputPublisher = ioRoute.first,
+                        receiverScope = scope,
+                        retainConfigEnvironment = retainConfigEnv
+                    )
+                } ?: kotlin.run {
+                    commander.executeExplicitRx(
+                        callerKey = request.callerKey,
+                        programPath = request.programPath,
+                        args = request.userArgs,
+                        env = request.envVars,
+                        workingDir = request.workingDir,
+                        outputPublisher = ioRoute.first,
+                        retainConfigEnvironment = retainConfigEnv
+                    )
+                }
+            }
+            job.start()
+            job.await()
+        } catch (e: Exception) {
+            Logger.error("Error executing async subprocess with program path ${request.programPath}: ${e.localizedMessage}")
+            job?.cancel("Async coroutines job failed with key: ${job.key}", e)
+            processorMap[request.callerKey]?.remove(ioRoute.first)
+        }
     }
 
     override fun watchFiles(directory: String, recursive: Boolean) {

@@ -99,16 +99,16 @@ object ConfigBuilder {
      * @param schemaPath path to file from which the JSON text will be read
      * @return list of decoded subprocess objects
      */
-    fun buildSubprocessCalls(
+    fun buildSubprocesses(
         schemaPath: String = CommandConstants.COMMAND_FILE_PATH
     ): List<ISubprocess>? = try {
         FSHelper.getFileText(schemaPath)?.let {
-            val list = parseSubprocessCalls(it)
+            val list = parseSubprocesses(it)
             with(arrayListOf<ISubprocess>()) {
                 list?.forEach { cmd -> add(cmd) }
                 this
             }
-        } ?: parseSubprocessCalls(IngenDefaults.DEFAULT_COMMANDS)
+        } ?: parseSubprocesses(IngenDefaults.DEFAULT_COMMANDS)
     } catch (e: Exception) {
         Logger.error(e)
         null
@@ -121,7 +121,7 @@ object ConfigBuilder {
      * @param schemaString file content as a string
      * @return list of parsed subprocess objects
      */
-    private fun parseSubprocessCalls(schemaString: String): List<ISubprocess>? = try {
+    private fun parseSubprocesses(schemaString: String): List<ISubprocess>? = try {
         val cmdArray = SerializationHandler
             .parseJsonArrayFromString(schemaString)
         with(arrayListOf<ISubprocess>()) {

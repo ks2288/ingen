@@ -68,7 +68,7 @@ class Commander(configuration: IngenConfig? = null) {
         callerKey: String,
         executable: ISubprocess,
         userArgs: List<String>,
-        env: MutableMap<String, String> = mutableMapOf(),
+        env: Map<String, String> = mutableMapOf(),
         retainConfigEnvironment: Boolean = true
     ): String {
         val outputBuilder = StringBuilder()
@@ -223,7 +223,7 @@ class Commander(configuration: IngenConfig? = null) {
         callerKey: String,
         executable: ISubprocess,
         userArgs: List<String>,
-        env: MutableMap<String, String> = mutableMapOf(),
+        env: Map<String, String> = mutableMapOf(),
         outputPublisher: BehaviorProcessor<String>,
         retainConfigEnvironment: Boolean = true
     ) {
@@ -284,7 +284,7 @@ class Commander(configuration: IngenConfig? = null) {
      * Executes an explicit async command, meaning it does not come from the loaded config's
      * program/command maps
      *
-     * @param commandPath full system path to the desired command
+     * @param programPath full system path to the desired command
      * @param args arguments to accompany the command path
      * @param workingDir directory from which the command should be executed
      * @param callerKey unique caller identification key
@@ -294,17 +294,17 @@ class Commander(configuration: IngenConfig? = null) {
      */
     fun executeExplicitRx(
         callerKey: String,
-        commandPath: String,
+        programPath: String,
         args: List<String>,
         workingDir: String,
-        env: MutableMap<String, String> = mutableMapOf(),
+        env: Map<String, String> = mutableMapOf(),
         outputPublisher: BehaviorProcessor<String>,
         retainConfigEnvironment: Boolean = true
     ) {
         val lb = StringBuilder()
         try {
             val cmdArgList = with(arrayListOf<String>()) {
-                add(commandPath)
+                add(programPath)
                 addAll(args)
                 this
             }
@@ -348,7 +348,7 @@ class Commander(configuration: IngenConfig? = null) {
                 callerKey = callerKey,
                 uid = "N/A (explicit execution)",
                 cmdCode = -1,
-                name = commandPath
+                name = programPath
             )
             endSession(callerKey)
         }
@@ -369,7 +369,7 @@ class Commander(configuration: IngenConfig? = null) {
         callerKey: String,
         executable: ISubprocess,
         userArgs: List<String>,
-        env: MutableMap<String, String> = mutableMapOf(),
+        env: Map<String, String> = mutableMapOf(),
         inputPublisher: BehaviorProcessor<String>,
         outputPublisher: BehaviorProcessor<String>,
         receiverScope: CoroutineScope = GlobalScope,
@@ -465,7 +465,7 @@ class Commander(configuration: IngenConfig? = null) {
         programPath: String,
         args: List<String>,
         workingDir: String,
-        env: MutableMap<String, String> = mutableMapOf(),
+        env: Map<String, String> = mutableMapOf(),
         inputPublisher: BehaviorProcessor<String>,
         outputPublisher: BehaviorProcessor<String>,
         receiverScope: CoroutineScope = GlobalScope,

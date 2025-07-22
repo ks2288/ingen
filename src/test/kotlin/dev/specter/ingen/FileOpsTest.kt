@@ -2,7 +2,7 @@
 
 package dev.specter.ingen
 
-import dev.specter.ingen.CommandExecutionTest.Companion.PYTHON_PATH
+import dev.specter.ingen.CommanderTest.Companion.PYTHON_PATH
 import dev.specter.ingen.config.IngenConfig
 import dev.specter.ingen.util.CommandConstants
 import dev.specter.ingen.util.Logger
@@ -73,7 +73,7 @@ class FileOpsTest {
         // block main thread and run test scenario with separate subprocess
         runTest {
             commander.executeExplicitRx(
-                commandPath = PYTHON_PATH,
+                programPath = PYTHON_PATH,
                 args = listOf(TEST_FILE_WRITER_PATH, "${TestConstants.TEST_MODULE_DIR}/fw"),
                 workingDir = IngenConfig.INGEN_DEFAULT_DIR,
                 callerKey = "101010",

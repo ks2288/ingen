@@ -2,10 +2,10 @@
 
 package dev.specter.ingen
 
-import dev.specter.ingen.config.ConfigBuilder
 import dev.specter.ingen.config.IngenConfig
 import dev.specter.ingen.util.TestConstants
 import io.reactivex.rxjava3.core.BackpressureStrategy
+import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import io.reactivex.rxjava3.schedulers.Schedulers
@@ -17,20 +17,23 @@ import org.junit.Test
 import kotlin.concurrent.thread
 import kotlin.test.fail
 
-class CommandExecutionTest {
+class CommanderTest {
     var idGenCount = 0
     private lateinit var commander: Commander
     private lateinit var outputPublisher: BehaviorProcessor<String>
     private lateinit var inputPublisher: BehaviorProcessor<String>
     private lateinit var mockAsyncCommandRx: Command
     private lateinit var mockAsyncCommandCoroutines: Command
+    // even though this will only contain 1 disposable at any time during test runs, this ensures
+    // that the composite wrapper functions as expected in repetitive fashion during actual runtime
+    private lateinit var composite: CompositeDisposable
 
     @Before
     fun setup() {
-        ConfigBuilder.initializeFS()
         commander = Commander()
         outputPublisher = BehaviorProcessor.create()
         inputPublisher = BehaviorProcessor.create()
+        composite = CompositeDisposable()
 
         mockAsyncCommandRx = Command(
             fileAlias = TestConstants.ASYNC_SHELL_SCRIPT_PATH,
@@ -58,6 +61,7 @@ class CommandExecutionTest {
                 delay(5000)
                 commander.killAll()
             }.await()
+            composite.dispose()
         }
     }
 
@@ -105,10 +109,11 @@ class CommandExecutionTest {
      * Ingen, unless otherwise configured, MUST pass the "True" flag in their own code as the second argument
      * to each call - print(..., flush=True); otherwise, the output will only be published when a semaphore
      * signals the end of the subprocess execution, which could span the entirety of app runtime in service-oriented
-     * subprocesses
+     * subprocesses; see `process.waitFor() within [Commander] to understand the points of interest in this regard
      */
     @Test
     fun test_execute_rx() {
+        val op = BehaviorProcessor.create<String>()
         val exec = Subprocess(
             command = mockAsyncCommandRx,
             uid = "112",
@@ -116,29 +121,30 @@ class CommandExecutionTest {
         idGenCount += 1
         val out = arrayListOf<String>()
 
-        outputPublisher
-            .toObservable()
-            .toFlowable(BackpressureStrategy.BUFFER)
-            .subscribeBy(
-                onNext = {
-                    println("*** I/O: $it ***")
-                    out.add(it)
-                },
-                onError = {
-                    commander.killAll()
-                    fail()
-                },
-                onComplete = {}
-            )
+        composite.add(
+            op.toObservable()
+                .toFlowable(BackpressureStrategy.BUFFER)
+                .subscribeBy(
+                    onNext = {
+                        println("*** I/O: $it ***")
+                        out.add(it)
+                    },
+                    onError = {
+                        commander.killAll()
+                        fail()
+                    },
+                    onComplete = {}
+                )
+        )
 
         commander.executeRx(
             callerKey = "1234",
             executable = exec,
             userArgs = listOf(),
-            outputPublisher = outputPublisher
+            outputPublisher = op
         )
 
-        runTest { assert(out.size == EXPECTED_MONITOR_OUTPUT_SIZE) }
+        runTest { assert(out.size == EXPECTED_ASYNC_OUTPUT_SIZE) }
     }
 
     @Test
@@ -146,22 +152,24 @@ class CommandExecutionTest {
         val out = arrayListOf<String>()
         val op = BehaviorProcessor.create<String>()
 
-        op.toObservable()
-            .toFlowable(BackpressureStrategy.BUFFER)
-            .subscribeBy(
-                onNext = {
-                    println("Test output received: $it")
-                    out.add(it)
-                },
-                onError = {
-                    commander.killAll()
-                    fail("Explicit RX test error...")
-                },
-                onComplete = {}
-            )
+        composite.add(
+            op.toObservable()
+                .toFlowable(BackpressureStrategy.BUFFER)
+                .subscribeBy(
+                    onNext = {
+                        println("Test output received: $it")
+                        out.add(it)
+                    },
+                    onError = {
+                        commander.killAll()
+                        fail("Explicit RX test error...")
+                    },
+                    onComplete = {}
+                )
+        )
 
         commander.executeExplicitRx(
-            commandPath = PYTHON_PATH,
+            programPath = PYTHON_PATH,
             args = listOf(EXPLICIT_RX_SCRIPT_PATH),
             workingDir = IngenConfig.INGEN_DEFAULT_DIR,
             callerKey = "101010",
@@ -180,22 +188,24 @@ class CommandExecutionTest {
         val out = arrayListOf<String>()
         val op = BehaviorProcessor.create<String>()
 
-        op.toObservable()
-            .toFlowable(BackpressureStrategy.LATEST)
-            .subscribeBy(
-                onNext = {
-                    println("Test output received: $it")
-                    out.add(it)
-                },
-                onError = {
-                    commander.killAll()
-                    fail("Explicit RX test error...")
-                }
-            )
+        composite.add(
+            op.toObservable()
+                .toFlowable(BackpressureStrategy.LATEST)
+                .subscribeBy(
+                    onNext = {
+                        println("Test output received: $it")
+                        out.add(it)
+                    },
+                    onError = {
+                        commander.killAll()
+                        fail("Explicit RX test error...")
+                    }
+                )
+        )
 
         runTest {
             commander.executeExplicitRx(
-                commandPath = PYTHON_PATH,
+                programPath = PYTHON_PATH,
                 args = listOf(EXPLICIT_RX_SCRIPT_PATH2),
                 workingDir = IngenConfig.INGEN_DEFAULT_DIR,
                 callerKey = "101010",
@@ -212,20 +222,22 @@ class CommandExecutionTest {
         val ip = BehaviorProcessor.create<String>()
         val op = BehaviorProcessor.create<String>()
 
-        op.toObservable()
-            .toFlowable(BackpressureStrategy.LATEST)
-            .observeOn(Schedulers.io())
-            .filter { it.isNotEmpty() }
-            .subscribeBy(
-                onNext = {
-                    println("Flowable observed: $it")
-                    out.add(it)
-                },
-                onError = {
-                    commander.killAll()
-                    fail(("Flowable test error: ${it.localizedMessage}"))
-                }
-            )
+        composite.add(
+            op.toObservable()
+                .toFlowable(BackpressureStrategy.LATEST)
+                .observeOn(Schedulers.io())
+                .filter { it.isNotEmpty() }
+                .subscribeBy(
+                    onNext = {
+                        println("Flowable observed: $it")
+                        out.add(it)
+                    },
+                    onError = {
+                        commander.killAll()
+                        fail(("Flowable test error: ${it.localizedMessage}"))
+                    }
+                )
+        )
 
         // timed interactive console inputs
         val job = GlobalScope.async {
@@ -262,16 +274,16 @@ class CommandExecutionTest {
     companion object {
         private val USER_HOME = System.getProperty("user.home")
         private const val ECHO_CONTENT = "test echo"
-        private const val EXPECTED_MONITOR_OUTPUT_SIZE = 10
         private const val ECHO_PATH = "/bin/echo"
-        private val INTERACTIVE_MODULE_PATH = "${IngenConfig
-            .INGEN_MODULE_DIR}/input_tester.py"
         private const val EXPECTED_INPUT_RESULT_SIZE_PYTHON = 2
         private val EXPLICIT_RX_SCRIPT_PATH =
             "${TestConstants.TEST_RES_DIR}/test_emitter.py"
-        private val EXPLICIT_RX_SCRIPT_PATH2 =
+        const val EXPECTED_ASYNC_OUTPUT_SIZE = 10
+        const val EXPECTED_EXPLICIT_RX_RESULTS_SIZE = 5
+        val EXPLICIT_RX_SCRIPT_PATH2 =
             "${TestConstants.TEST_RES_DIR}/test_async_emitter.py"
-        private const val EXPECTED_EXPLICIT_RX_RESULTS_SIZE = 5
+        val INTERACTIVE_MODULE_PATH = "${IngenConfig
+            .INGEN_MODULE_DIR}/input_test.py"
         val PYTHON_PATH = "$USER_HOME/.pyenv/shims/python"
     }
 }

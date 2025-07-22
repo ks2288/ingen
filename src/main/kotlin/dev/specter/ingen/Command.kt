@@ -86,6 +86,7 @@ data class Command(
     @SerialName("desc")
     override val description: String
 ): ICommand {
+    // TODO: remove this along with the property it backs - not needed; designation handled by presence of input proc and method call in Commander
     val processType: ProcessType
         get() = ProcessType.entries.first { it.ordinal == typeCode }
 }
