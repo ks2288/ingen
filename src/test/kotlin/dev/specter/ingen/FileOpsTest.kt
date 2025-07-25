@@ -12,7 +12,6 @@ import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -58,15 +57,14 @@ class FileOpsTest {
                 onError = { fail("File watcher test error: ${it.localizedMessage}") },
                 onComplete = { return@subscribeBy }
             )
-        val channel: Channel<Int> = Channel()
+        val ctlProc = BehaviorProcessor.create<String>()
 
-        // spawn a thread for the file watcher; necessary for real-time (hot) flow of data
         thread {
             commander.spawnFileWatch(
                 callerKey = "01010",
                 watchDirectory = wd,
                 outputPublisher = fwPublisher,
-                killChannel = channel,
+                killChannel = ctlProc,
             )
         }
 
@@ -84,7 +82,7 @@ class FileOpsTest {
             // assert after delay (currently just checking for callback ability)
             assert(out.isNotEmpty())
             // send the SIG_KILL to the kill channel to break the threaded method's loop
-            channel.send(CommandConstants.SIG_KILL.toInt())
+            ctlProc.onNext(CommandConstants.SIG_KILL.toInt().toString())
         }
     }
 

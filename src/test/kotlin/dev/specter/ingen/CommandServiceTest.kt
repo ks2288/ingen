@@ -2,15 +2,19 @@
 
 package dev.specter.ingen
 
+import dev.specter.ingen.CommanderTest.Companion.PYTHON_PATH
+import dev.specter.ingen.FileOpsTest.Companion.TEARDOWN_DELAY
+import dev.specter.ingen.FileOpsTest.Companion.TEST_FILE_WRITER_PATH
 import dev.specter.ingen.config.IngenConfig
+import dev.specter.ingen.util.CommandConstants
+import dev.specter.ingen.util.Logger
+import dev.specter.ingen.util.TestConstants
 import io.reactivex.rxjava3.core.BackpressureStrategy
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.processors.BehaviorProcessor
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
+import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -84,7 +88,7 @@ class CommandServiceTest {
         val route = IORoute(BehaviorProcessor.create(), null)
         val request = IExecRequestExplicit.create(
             key = "01011",
-            path = CommanderTest.PYTHON_PATH,
+            path = PYTHON_PATH,
             directory = IngenConfig.INGEN_DEFAULT_DIR,
             args = listOf(CommanderTest.EXPLICIT_RX_SCRIPT_PATH2)
         )
@@ -164,7 +168,7 @@ class CommandServiceTest {
         val route = IORoute(BehaviorProcessor.create(), BehaviorProcessor.create())
         val request = IExecRequestExplicit.create(
             key = "01012",
-            path = CommanderTest.PYTHON_PATH,
+            path = PYTHON_PATH,
             directory = IngenConfig.INGEN_DEFAULT_DIR,
             args = listOf(CommanderTest.INTERACTIVE_MODULE_PATH)
         )
@@ -203,6 +207,65 @@ class CommandServiceTest {
             job2.await()
             job.await()
             assert(out.isNotEmpty())
+        }
+    }
+
+    @Test
+    fun test_service_launch_file_watcher() {
+        val route = IORoute(BehaviorProcessor.create(), BehaviorProcessor.create())
+        val route2 = IORoute(BehaviorProcessor.create(), null)
+        val wd = "${TestConstants.TEST_MODULE_DIR}/fw"
+        val request = IFileWatchRequest.create(key = "10102", directory = wd)
+        val request2 = IExecRequestExplicit.create(
+            key = "101110",
+            path = PYTHON_PATH,
+            directory = IngenConfig.INGEN_DEFAULT_DIR,
+            args = listOf(TEST_FILE_WRITER_PATH, "${TestConstants.TEST_MODULE_DIR}/fw")
+        )
+        val out = arrayListOf<String>()
+
+        composite.add(
+            route.first.toObservable()
+                .toFlowable(BackpressureStrategy.BUFFER)
+                .observeOn(Schedulers.io())
+                .subscribeBy(
+                    onNext = {
+                        Logger.debug("Route 1 output received:\n\n$it")
+                        out.add(it)
+                    },
+                    onError = { fail("Route 1 FW test error: ${it.localizedMessage}") },
+                    onComplete = { return@subscribeBy }
+                )
+        )
+
+        composite.add(
+            route2.first.toObservable()
+                .toFlowable(BackpressureStrategy.BUFFER)
+                .observeOn(Schedulers.io())
+                .subscribeBy(
+                    onNext = {
+                        Logger.debug("Route 2 output received:\n\n$it")
+                        out.add(it)
+                    },
+                    onError = { fail("Route 2 FW test error: ${it.localizedMessage}") },
+                    onComplete = { return@subscribeBy }
+                )
+        )
+
+        GlobalScope.launch {
+            CommandService.watchFiles(request = request, route = route, scope = this)
+        }
+
+        val job2 = GlobalScope.async {
+            CommandService.executeExplicitAsync(request = request2, ioRoute = route2, scope = this)
+        }
+
+        runTest {
+            job2.start()
+            job2.await()
+            assert(out.isNotEmpty())
+            route.second!!.onNext(CommandConstants.SIG_KILL.toInt().toString())
+            delay(TEARDOWN_DELAY)
         }
     }
 }

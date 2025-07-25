@@ -6,15 +6,18 @@ import dev.specter.ingen.config.ConfigBuilder
 import dev.specter.ingen.config.IngenConfig
 import dev.specter.ingen.util.CommandConstants.SIG_KILL
 import dev.specter.ingen.util.Logger
+import io.reactivex.rxjava3.core.BackpressureStrategy
+import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.consumeAsFlow
 import java.io.*
 import java.nio.file.FileSystems
 import java.nio.file.Path
 import java.nio.file.StandardWatchEventKinds
+import java.nio.file.WatchKey
+import java.nio.file.WatchService
 import java.util.*
+import kotlin.io.FileSystemException
 
 /**
  * Class for handling all sand-boxed subprocesses via the JDK's
@@ -559,33 +562,43 @@ class Commander(configuration: IngenConfig? = null) {
         callerKey: String,
         watchDirectory: String,
         outputPublisher: BehaviorProcessor<String>,
-        killChannel: Channel<Int>,
+        killChannel: BehaviorProcessor<String>,
         receiverScope: CoroutineScope = GlobalScope,
         echoContents: Boolean = true
     ) {
         val logBuilder = StringBuilder()
+        var watchService: WatchService? = null
+        var keySet: WatchKey? = null
+        var watchKey: WatchKey? = null
         try {
-            val watchService = FileSystems.getDefault().newWatchService()
             val watchPath = File(watchDirectory).toPath()
-            val keys = watchPath.register(
+            watchService = FileSystems.getDefault().newWatchService()
+            keySet = watchPath.register(
                 watchService,
                 StandardWatchEventKinds.ENTRY_CREATE,
                 StandardWatchEventKinds.ENTRY_DELETE,
                 StandardWatchEventKinds.ENTRY_MODIFY
             )
-            val watchKey = watchService.take()
+            watchKey = watchService.take()
             var hold = true
             receiverScope.launch {
                 // job to watch caller's channel for kill signal
                 val inputJob = async {
                     Logger.debug("File watch kill channel launched...")
-                    killChannel.consumeAsFlow().collect {
-                        Logger.debug("File watch control channel signal received: $it")
-                        if (it.toUByte() == SIG_KILL) {
-                            Logger.debug("File watch SIG_KILL received...")
-                            hold = false
-                        }
-                    }
+                    killChannel.toObservable()
+                        .toFlowable(BackpressureStrategy.LATEST)
+                        .subscribeBy(
+                            onNext = {
+                                Logger.debug("File watch control channel signal received: $it")
+                                if (it.toInt().toUByte() == SIG_KILL) {
+                                    Logger.debug("File watch SIG_KILL received...")
+                                    hold = false
+                                }
+                            },
+                            onError = {
+                                Logger.error("File watch control channel error: ${it.localizedMessage}")
+                            }
+                        )
                 }
                 inputJob.start()
                 while (hold) {
@@ -596,7 +609,6 @@ class Commander(configuration: IngenConfig? = null) {
                         val s = StringBuilder()
                         when (kind) {
                             StandardWatchEventKinds.ENTRY_CREATE -> {
-                                // TODO: pass lambdas for handling events here
                                 Logger.debug("[CMDR] File created at: $fileDir")
                                 if (echoContents) {
                                     val f = File(fileDir)
@@ -624,7 +636,7 @@ class Commander(configuration: IngenConfig? = null) {
                 inputJob.cancel()
                 watchKey.cancel()
                 watchService.close()
-                keys.cancel()
+                keySet.cancel()
                 outputPublisher.onComplete()
                 Logger.logToFile(
                     text = logBuilder.toString(),
@@ -637,6 +649,9 @@ class Commander(configuration: IngenConfig? = null) {
                 )
             }
         } catch (e: Exception) {
+            watchKey?.cancel()
+            watchService?.close()
+            keySet?.cancel()
             val msg = "File watcher exited with error: ${e.localizedMessage}"
             val c = Calendar.getInstance().time
             Logger.error(msg)

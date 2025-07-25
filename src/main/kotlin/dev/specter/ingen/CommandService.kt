@@ -94,17 +94,16 @@ interface ICommandService {
     /**
      * Spawns a file watcher subprocess, watching a given directory
      *
-     * @param directory path to directory to watch
-     * @param recursive whether to recursively watch the given directory's children
+     * @param request execution request containing all relevant information about caller and files to watch
+     * @param route Rx processor pair for file watch service IO
+     * @param scope caller's coroutine scope, if provided (defaults to [GlobalScope])
      */
-    fun watchFiles(directory: String, recursive: Boolean = true)
-
-    /**
-     * Destroys a given native program by PID
-     *
-     * @param pid the Linux "PID" of the program in question
-     */
-    fun destroy(pid: String)
+    @OptIn(DelicateCoroutinesApi::class)
+    suspend fun watchFiles(
+        request: IFileWatchRequest,
+        route: IORoute,
+        scope: CoroutineScope = GlobalScope
+    )
 
     /**
      * Destroys all running programs for a given caller by caller key
@@ -287,12 +286,31 @@ object CommandService : ICommandService {
         }
     }
 
-    override fun watchFiles(directory: String, recursive: Boolean) {
-        TODO("Not yet implemented")
-    }
-
-    override fun destroy(pid: String) {
-        TODO("Not yet implemented")
+    override suspend fun watchFiles(
+        request: IFileWatchRequest,
+        route: IORoute,
+        scope: CoroutineScope
+    ) {
+        var job: Deferred<Unit>? = null
+        try {
+            val ctl = route.second ?: kotlin.run {
+                throw Exception("No input processor passed to file watch request...")
+            }
+            job = scope.async {
+                commander.spawnFileWatch(
+                    callerKey = request.callerKey,
+                    watchDirectory = request.watchDirectory,
+                    outputPublisher = route.first,
+                    killChannel = ctl,
+                    receiverScope = scope
+                )
+            }
+            job.start()
+            job.await()
+        } catch (e: Exception) {
+            Logger.error("Error executing file watcher for caller ${request.callerKey}: ${e.localizedMessage}")
+            job?.cancel("Async coroutines job failed with key: ${job.key}", e)
+        }
     }
 
     override fun batchDestroy() {

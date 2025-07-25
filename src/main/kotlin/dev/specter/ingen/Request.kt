@@ -1,8 +1,12 @@
 package dev.specter.ingen
 
 import io.reactivex.rxjava3.processors.BehaviorProcessor
+import kotlinx.coroutines.channels.Channel
 
+/// Route "package" for all async ops, including mandatory output publisher and optional input publisher
 typealias IORoute = Pair<BehaviorProcessor<String>, BehaviorProcessor<String>?>
+/// Route "package" for all file watcher launches
+typealias IORouteFW = Pair<BehaviorProcessor<String>, Channel<Int>>
 
 interface IExecRequest {
     val callerKey: String
@@ -48,6 +52,26 @@ interface IExecRequestExplicit {
                 override val workingDir: String = directory
                 override val userArgs: List<String> = args
                 override val envVars: Map<String, String> = env
+            }
+        }
+    }
+}
+
+interface IFileWatchRequest {
+    val callerKey: String
+    val watchDirectory: String
+    val isRecursive: Boolean
+
+    companion object {
+        fun create(
+            key: String,
+            directory: String,
+            recursive: Boolean = true
+        ) : IFileWatchRequest {
+            return object : IFileWatchRequest {
+                override val callerKey: String = key
+                override val watchDirectory: String = directory
+                override val isRecursive: Boolean = recursive
             }
         }
     }
