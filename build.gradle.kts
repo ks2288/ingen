@@ -6,8 +6,6 @@ val kotlinxCoroutinesRx3Name: String by project
 val kotlinxCoroutinesTestName: String by project
 val kotlinxSerialVersion: String by project
 val kotlinxJsonSerializerName: String by project
-val kotlinTestName: String by project
-val kotlinTestVersion: String by project
 val rxJavaName: String by project
 val rxjavaVersion: String by project
 val rxKotlinVersion: String by project
@@ -20,7 +18,7 @@ plugins {
 }
 
 group = "com.github.ks288"
-version = "1.1.0"
+version = "1.2.0"
 
 dependencies {
     api("$kotlinxCoroutinesCoreName: $kotlinxVersion")
