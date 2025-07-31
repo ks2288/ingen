@@ -19,6 +19,10 @@ import java.nio.file.WatchService
 import java.util.*
 import kotlin.io.FileSystemException
 
+typealias FileWatcherID = Pair<WatchKey, WatchService>
+typealias ProcessMap = MutableMap<String, ArrayList<Process>>
+typealias WatcherMap = MutableMap<String, ArrayList<FileWatcherID>>
+
 /**
  * Class for handling all sand-boxed subprocesses via the JDK's
  * [ProcessBuilder], with support for both Rx-based behavioral and
@@ -40,7 +44,8 @@ class Commander(configuration: IngenConfig? = null) {
     //region Properties
 
     private val config: IngenConfig
-    private val procMap: MutableMap<String, ArrayList<Process>> = mutableMapOf()
+    private val procMap: ProcessMap = mutableMapOf()
+    private val watchMap: WatcherMap = mutableMapOf()
 
     //endregion
 
@@ -580,6 +585,11 @@ class Commander(configuration: IngenConfig? = null) {
                 StandardWatchEventKinds.ENTRY_MODIFY
             )
             watchKey = watchService.take()
+            addFileWatcher(
+                callerKey = callerKey,
+                watchKey = watchKey!!,
+                watchService = watchService!!
+            )
             var hold = true
             receiverScope.launch {
                 // job to watch caller's channel for kill signal
@@ -689,6 +699,17 @@ class Commander(configuration: IngenConfig? = null) {
     fun killAll() {
         procMap.forEach { endSession(callerKey = it.key, forcible = true) }
         procMap.clear()
+        watchMap.forEach {
+            Logger.debug("Ending FW Service for caller: ${it.key}")
+            it.value.forEach { id ->
+                id.first.cancel()
+                Logger.debug("Watch key cancelled: ${id.first}")
+                id.second.close()
+                // TODO: there has to be a better way to label this termination than the hash code
+                Logger.debug("Watch service closed with hash code: ${id.second.hashCode()}")
+            }
+        }
+        watchMap.clear()
     }
 
     //endregion
@@ -826,6 +847,23 @@ class Commander(configuration: IngenConfig? = null) {
             procMap.put(key, arrayListOf(process))
             Logger.debug("New session created for caller: $key " +
                     "\n\tPID: (${process.pid()})")
+        }
+    }
+
+    /**
+     * Adds a new file watcher (by key) to the local map, for cataloging/cleanup
+     *
+     * @param callerKey unique caller UID
+     * @param watchKey [WatchService] key, unique to the native file watcher process
+     * @param watchService reference to [WatchService]
+     */
+    private fun addFileWatcher(callerKey: String, watchKey: WatchKey, watchService: WatchService) {
+        val new = Pair(watchKey, watchService)
+        watchMap[callerKey]?.let { w ->
+            w.add(new)
+            Logger.debug("New file watcher added for caller $callerKey with watch key: $watchKey")
+        } ?: kotlin.run {
+            watchMap.put(callerKey, arrayListOf(new))
         }
     }
 

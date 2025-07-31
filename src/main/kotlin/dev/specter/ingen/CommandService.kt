@@ -189,13 +189,12 @@ object CommandService : ICommandService {
         retainConfigEnv: Boolean,
         scope: CoroutineScope
     ) {
-        var job: Deferred<Unit>? = null
         try {
             val sp = commands.first { it.uid.toInt() == request.subprocessUID } as Subprocess
             processorMap[request.callerKey]?.add(ioRoute.first) ?: kotlin.run {
                 processorMap.put(request.callerKey, arrayListOf(ioRoute.first))
             }
-            job = scope.async {
+            withContext(Dispatchers.IO) {
                 ioRoute.second?.let {
                     commander.executeInteractive(
                         callerKey = request.callerKey,
@@ -218,11 +217,8 @@ object CommandService : ICommandService {
                     )
                 }
             }
-            job.start()
-            job.await()
         } catch (e: Exception) {
             Logger.error("Error executing async subprocess with code ${request.subprocessUID}: ${e.localizedMessage}")
-            job?.cancel("Async coroutines job failed with key: ${job.key}", e)
             processorMap[request.callerKey]?.remove(ioRoute.first)
         }
     }
@@ -247,12 +243,11 @@ object CommandService : ICommandService {
         retainConfigEnv: Boolean,
         scope: CoroutineScope
     ) {
-        var job: Deferred<Unit>? = null
         try {
             processorMap[request.callerKey]?.add(ioRoute.first) ?: kotlin.run {
                 processorMap.put(request.callerKey, arrayListOf(ioRoute.first))
             }
-            job = scope.async {
+            withContext(Dispatchers.IO) {
                 ioRoute.second?.let {
                     commander.executeExplicitInteractive(
                         callerKey = request.callerKey,
@@ -277,11 +272,8 @@ object CommandService : ICommandService {
                     )
                 }
             }
-            job.start()
-            job.await()
         } catch (e: Exception) {
             Logger.error("Error executing async subprocess with program path ${request.programPath}: ${e.localizedMessage}")
-            job?.cancel("Async coroutines job failed with key: ${job.key}", e)
             processorMap[request.callerKey]?.remove(ioRoute.first)
         }
     }
@@ -291,12 +283,11 @@ object CommandService : ICommandService {
         route: IORoute,
         scope: CoroutineScope
     ) {
-        var job: Deferred<Unit>? = null
         try {
             val ctl = route.second ?: kotlin.run {
                 throw Exception("No input processor passed to file watch request...")
             }
-            job = scope.async {
+            withContext(Dispatchers.IO) {
                 commander.spawnFileWatch(
                     callerKey = request.callerKey,
                     watchDirectory = request.watchDirectory,
@@ -305,11 +296,8 @@ object CommandService : ICommandService {
                     receiverScope = scope
                 )
             }
-            job.start()
-            job.await()
         } catch (e: Exception) {
             Logger.error("Error executing file watcher for caller ${request.callerKey}: ${e.localizedMessage}")
-            job?.cancel("Async coroutines job failed with key: ${job.key}", e)
         }
     }
 
