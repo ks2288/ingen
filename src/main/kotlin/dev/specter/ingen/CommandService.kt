@@ -189,12 +189,12 @@ object CommandService : ICommandService {
         retainConfigEnv: Boolean,
         scope: CoroutineScope
     ) {
-        try {
-            val sp = commands.first { it.uid.toInt() == request.subprocessUID } as Subprocess
-            processorMap[request.callerKey]?.add(ioRoute.first) ?: kotlin.run {
-                processorMap.put(request.callerKey, arrayListOf(ioRoute.first))
-            }
-            withContext(Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
+            try {
+                val sp = commands.first { it.uid.toInt() == request.subprocessUID } as Subprocess
+                processorMap[request.callerKey]?.add(ioRoute.first) ?: kotlin.run {
+                    processorMap.put(request.callerKey, arrayListOf(ioRoute.first))
+                }
                 ioRoute.second?.let {
                     commander.executeInteractive(
                         callerKey = request.callerKey,
@@ -216,10 +216,10 @@ object CommandService : ICommandService {
                         retainConfigEnvironment = retainConfigEnv
                     )
                 }
+            } catch (e: Exception) {
+                Logger.error("Error executing async subprocess with code ${request.subprocessUID}: ${e.localizedMessage}")
+                processorMap[request.callerKey]?.remove(ioRoute.first)
             }
-        } catch (e: Exception) {
-            Logger.error("Error executing async subprocess with code ${request.subprocessUID}: ${e.localizedMessage}")
-            processorMap[request.callerKey]?.remove(ioRoute.first)
         }
     }
 
@@ -243,11 +243,11 @@ object CommandService : ICommandService {
         retainConfigEnv: Boolean,
         scope: CoroutineScope
     ) {
-        try {
-            processorMap[request.callerKey]?.add(ioRoute.first) ?: kotlin.run {
-                processorMap.put(request.callerKey, arrayListOf(ioRoute.first))
-            }
-            withContext(Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
+            try {
+                processorMap[request.callerKey]?.add(ioRoute.first) ?: kotlin.run {
+                    processorMap.put(request.callerKey, arrayListOf(ioRoute.first))
+                }
                 ioRoute.second?.let {
                     commander.executeExplicitInteractive(
                         callerKey = request.callerKey,
@@ -271,10 +271,10 @@ object CommandService : ICommandService {
                         retainConfigEnvironment = retainConfigEnv
                     )
                 }
+            } catch (e: Exception) {
+                Logger.error("Error executing async subprocess with program path ${request.programPath}: ${e.localizedMessage}")
+                processorMap[request.callerKey]?.remove(ioRoute.first)
             }
-        } catch (e: Exception) {
-            Logger.error("Error executing async subprocess with program path ${request.programPath}: ${e.localizedMessage}")
-            processorMap[request.callerKey]?.remove(ioRoute.first)
         }
     }
 
@@ -283,11 +283,12 @@ object CommandService : ICommandService {
         route: IORoute,
         scope: CoroutineScope
     ) {
-        try {
-            val ctl = route.second ?: kotlin.run {
-                throw Exception("No input processor passed to file watch request...")
-            }
-            withContext(Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
+            try {
+                val ctl = route.second ?: kotlin.run {
+                    throw Exception("No input processor passed to file watch request...")
+                }
+
                 commander.spawnFileWatch(
                     callerKey = request.callerKey,
                     watchDirectory = request.watchDirectory,
@@ -295,9 +296,9 @@ object CommandService : ICommandService {
                     killChannel = ctl,
                     receiverScope = scope
                 )
+            } catch (e: Exception) {
+                Logger.error("Error executing file watcher for caller ${request.callerKey}: ${e.localizedMessage}")
             }
-        } catch (e: Exception) {
-            Logger.error("Error executing file watcher for caller ${request.callerKey}: ${e.localizedMessage}")
         }
     }
 
@@ -322,12 +323,12 @@ object CommandService : ICommandService {
 
     override fun batchDispose() {
         processorMap.forEach { it.value.forEach { cd -> cd.onComplete() } }
-        processorMap.clear()
     }
 
     override fun teardown(postRun: (() -> Unit)?) {
-        batchDestroy()
         batchDispose()
+        batchDestroy()
+        processorMap.clear()
         postRun?.invoke()
     }
 }
