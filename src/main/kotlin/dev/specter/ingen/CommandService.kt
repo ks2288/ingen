@@ -326,7 +326,6 @@ object CommandService : ICommandService {
     }
 
     override fun teardown(postRun: (() -> Unit)?) {
-        batchDispose()
         batchDestroy()
         processorMap.clear()
         postRun?.invoke()
