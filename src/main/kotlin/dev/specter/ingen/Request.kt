@@ -1,37 +1,14 @@
 package dev.specter.ingen
 
+import dev.specter.ingen.config.ConfigBuilder
+import dev.specter.ingen.config.IngenConfig
+import dev.specter.ingen.util.Logger
 import io.reactivex.rxjava3.processors.BehaviorProcessor
-import kotlinx.coroutines.channels.Channel
 
 /// Route "package" for all async ops, including mandatory output publisher and optional input publisher
 typealias IORoute = Pair<BehaviorProcessor<String>, BehaviorProcessor<String>?>
-/// Route "package" for all file watcher launches
-typealias IORouteFW = Pair<BehaviorProcessor<String>, Channel<Int>>
 
-interface IExecRequest {
-    val callerKey: String
-    val subprocessUID: Int
-    val userArgs: List<String>
-    val envVars: Map<String, String>
-
-    companion object {
-        fun create(
-            key: String,
-            uid: Int,
-            args: List<String> = listOf(),
-            env: Map<String, String> = mapOf()
-        ) : IExecRequest {
-            return object: IExecRequest {
-                override val callerKey: String = key
-                override val subprocessUID: Int = uid
-                override val userArgs: List<String> = args
-                override val envVars: Map<String, String> = env
-            }
-        }
-    }
-}
-
-interface IExecRequestExplicit {
+interface ILaunchRequest {
     val callerKey: String
     val programPath: String
     val workingDir: String
@@ -42,17 +19,42 @@ interface IExecRequestExplicit {
         fun create(
             key: String,
             path: String,
-            directory: String,
+            directory: String = IngenConfig.INGEN_DEFAULT_DIR,
             args: List<String> = listOf(),
             env: Map<String, String> = mapOf()
-        ) : IExecRequestExplicit {
-            return object : IExecRequestExplicit {
+        ) : ILaunchRequest {
+            return object : ILaunchRequest {
                 override val callerKey: String = key
                 override val programPath: String = path
                 override val workingDir: String = directory
                 override val userArgs: List<String> = args
                 override val envVars: Map<String, String> = env
             }
+        }
+
+        fun create(
+            key: String,
+            uid: Int,
+            args: List<String> = listOf(),
+            env: Map<String, String> = mapOf()
+        ): ILaunchRequest? = try {
+            ConfigBuilder.buildSubprocesses()
+                ?.first{ it.uid == uid.toString() }
+                ?.let { sp ->
+                    val prog = CommandService.config.paths.entries.first { p ->
+                        p.value.code == sp.command.programCode
+                    }.value
+                    create(
+                        key = key,
+                        path = prog.path,
+                        directory = sp.command.directory.takeIf { it.isNotEmpty() } ?: IngenConfig.INGEN_DEFAULT_DIR,
+                        args = sp.toArgsList(userArgs = args),
+                        env = env
+                    )
+                }
+        } catch (e: Exception) {
+            Logger.error(e)
+            null
         }
     }
 }

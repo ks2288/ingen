@@ -30,37 +30,6 @@ interface ICommandService {
     val processorMap: MutableMap<String, ArrayList<BehaviorProcessor<String>>>
 
     /**
-     * Simplest method for executing a simple, blocking FIFO call; meant for the simplest
-     * and most lightweight subprocess calls
-     *
-     * @param request execution request containing all relevant information about caller and program
-     * @param retainConfigEnv whether to retain the environment variables listed in the config file
-     * @return subprocess output as a raw string, via STDOUT
-     *
-     */
-    fun execute(
-        request: IExecRequest,
-        retainConfigEnv: Boolean = true
-    ): String
-
-    /**
-     * Method for executing asynchronous subprocesses that likely carry long-running or more complex
-     * operations than those launched via [execute]
-     *
-     * @param request execution request containing all relevant information about caller and program
-     * @param ioRoute Rx processor pair for subprocess IO
-     * @param retainConfigEnv whether to retain the environment variables listed in the config file
-     * @param scope caller's coroutine scope, if provided (defaults to [GlobalScope])
-     */
-    @OptIn(DelicateCoroutinesApi::class)
-    suspend fun executeAsync(
-        request: IExecRequest,
-        ioRoute: IORoute,
-        retainConfigEnv: Boolean = true,
-        scope: CoroutineScope = GlobalScope
-    )
-
-    /**
      * Simplest method for executing an explicit, blocking FIFO call; meant for the simplest
      * and most lightweight subprocess calls; using this method implies you are calling a
      * program on the native system that is NOT listed within the JSON commands file
@@ -71,7 +40,7 @@ interface ICommandService {
      *
      */
     fun executeExplicit(
-        request: IExecRequestExplicit,
+        request: ILaunchRequest,
         retainConfigEnv: Boolean = true
     ): String
 
@@ -84,8 +53,8 @@ interface ICommandService {
      * @param scope caller's coroutine scope, if provided (defaults to [GlobalScope])
      */
     @OptIn(DelicateCoroutinesApi::class)
-    suspend fun executeExplicitAsync(
-        request: IExecRequestExplicit,
+    suspend fun executeAsync(
+        request: ILaunchRequest,
         ioRoute: IORoute,
         retainConfigEnv: Boolean = true,
         scope: CoroutineScope = GlobalScope
@@ -169,62 +138,8 @@ object CommandService : ICommandService {
     override val processorMap: MutableMap<String, ArrayList<BehaviorProcessor<String>>> =
         mutableMapOf()
 
-    override fun execute(
-        request: IExecRequest,
-        retainConfigEnv: Boolean
-    ): String {
-        val sp = commands.first { it.uid.toInt() == request.subprocessUID } as Subprocess
-        return commander.execute(
-            callerKey = request.callerKey,
-            executable = sp,
-            userArgs = request.userArgs,
-            env = request.envVars,
-            retainConfigEnvironment = retainConfigEnv
-        )
-    }
-
-    override suspend fun executeAsync(
-        request: IExecRequest,
-        ioRoute: IORoute,
-        retainConfigEnv: Boolean,
-        scope: CoroutineScope
-    ) {
-        withContext(Dispatchers.IO) {
-            try {
-                val sp = commands.first { it.uid.toInt() == request.subprocessUID } as Subprocess
-                processorMap[request.callerKey]?.add(ioRoute.first) ?: kotlin.run {
-                    processorMap.put(request.callerKey, arrayListOf(ioRoute.first))
-                }
-                ioRoute.second?.let {
-                    commander.executeInteractive(
-                        callerKey = request.callerKey,
-                        executable = sp,
-                        userArgs = request.userArgs,
-                        env = request.envVars,
-                        inputPublisher = it,
-                        outputPublisher = ioRoute.first,
-                        receiverScope = scope,
-                        retainConfigEnvironment = retainConfigEnv
-                    )
-                } ?: kotlin.run {
-                    commander.executeRx(
-                        callerKey = request.callerKey,
-                        executable = sp,
-                        userArgs = request.userArgs,
-                        env = request.envVars,
-                        outputPublisher = ioRoute.first,
-                        retainConfigEnvironment = retainConfigEnv
-                    )
-                }
-            } catch (e: Exception) {
-                Logger.error("Error executing async subprocess with code ${request.subprocessUID}: ${e.localizedMessage}")
-                processorMap[request.callerKey]?.remove(ioRoute.first)
-            }
-        }
-    }
-
     override fun executeExplicit(
-        request: IExecRequestExplicit,
+        request: ILaunchRequest,
         retainConfigEnv: Boolean
     ): String {
         return commander.executeExplicit(
@@ -237,8 +152,8 @@ object CommandService : ICommandService {
         )
     }
 
-    override suspend fun executeExplicitAsync(
-        request: IExecRequestExplicit,
+    override suspend fun executeAsync(
+        request: ILaunchRequest,
         ioRoute: IORoute,
         retainConfigEnv: Boolean,
         scope: CoroutineScope
@@ -249,7 +164,7 @@ object CommandService : ICommandService {
                     processorMap.put(request.callerKey, arrayListOf(ioRoute.first))
                 }
                 ioRoute.second?.let {
-                    commander.executeExplicitInteractive(
+                    commander.executeInteractive(
                         callerKey = request.callerKey,
                         programPath = request.programPath,
                         args = request.userArgs,
@@ -261,7 +176,7 @@ object CommandService : ICommandService {
                         retainConfigEnvironment = retainConfigEnv
                     )
                 } ?: kotlin.run {
-                    commander.executeExplicitRx(
+                    commander.executeAsync(
                         callerKey = request.callerKey,
                         programPath = request.programPath,
                         args = request.userArgs,

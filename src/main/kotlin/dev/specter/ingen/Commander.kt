@@ -66,6 +66,7 @@ class Commander(configuration: IngenConfig? = null) {
     /**
      * Executes an environment process via the JRE with the given args
      *
+     * @param callerKey unique caller UID
      * @param executable subprocess command object
      * @param userArgs string array containing the process args
      * @param env string map of any necessary environment variables for prime program
@@ -75,7 +76,7 @@ class Commander(configuration: IngenConfig? = null) {
     fun execute(
         callerKey: String,
         executable: ISubprocess,
-        userArgs: List<String>,
+        userArgs: List<String> = listOf(),
         env: Map<String, String> = mutableMapOf(),
         retainConfigEnvironment: Boolean = true
     ): String {
@@ -141,17 +142,18 @@ class Commander(configuration: IngenConfig? = null) {
     /**
      * Executes an environment process via the JRE with the given args
      *
+     * @param callerKey unique caller UID
      * @param commandPath path to system command
      * @param args any necessary arguments, with any needed alias at index 0
      * @param env string map of any necessary environment variables for prime program
      * @param workingDir directory from which to spawn the subprocess
      * @param retainConfigEnvironment whether to retain all env vars from config file
-     * @return text of process's stdout
+     * @return text of process's STDOUT and/or STDERR
      */
     fun executeExplicit(
         callerKey: String,
         commandPath: String,
-        args: List<String>,
+        args: List<String> = listOf(),
         env: Map<String, String> = mutableMapOf(),
         workingDir: String = IngenConfig.INGEN_DEFAULT_DIR,
         retainConfigEnvironment: Boolean = true
@@ -219,94 +221,24 @@ class Commander(configuration: IngenConfig? = null) {
     }
 
     /**
-     * Monitors I/O from a given subprocess via redirection and publishes both
-     * output (process STDIN) and errors (process STDERR) to Rx observers while
-     * also logging to file per command on the runtime host
-     *
-     * @param executable object containing all necessary command info
-     * @param userArgs string array containing the process args
-     * @param outputPublisher output route for subprocess STDOUT
-     */
-    fun executeRx(
-        callerKey: String,
-        executable: ISubprocess,
-        userArgs: List<String>,
-        env: Map<String, String> = mutableMapOf(),
-        outputPublisher: BehaviorProcessor<String>,
-        retainConfigEnvironment: Boolean = true
-    ) {
-        val lb = StringBuilder()
-        val args = buildArguments(executable, userArgs)
-        val wdp = getWorkingDirectoryPath(executable)
-        try {
-            val pb = buildProcess(
-                workingDir = wdp,
-                args = args,
-                env = env,
-                redirectInput = true,
-                redirectError = true,
-                retainConfigEnvironment = retainConfigEnvironment
-            )
-
-            val process = pb.start()
-            addSubprocess(callerKey, process)
-
-            process.inputStream.bufferedReader().forEachLine { string ->
-                Logger.debug("[CMDR] Subprocess output received: $string")
-                lb.appendLine("${Calendar.getInstance().time}: $string")
-                outputPublisher.onNext(string)
-            }
-
-            process.errorStream.bufferedReader().forEachLine { string ->
-                Logger.error("[CMDR] Subprocess error received: $string")
-                lb.appendLine("${Calendar.getInstance().time}: $string")
-                outputPublisher.onNext(string)
-            }
-
-            val exitVal = process.waitFor()
-            outputPublisher.onComplete()
-            val s = "Subprocess exited with code: $exitVal"
-            Logger.debug(s)
-            lb.appendLine("\n${Calendar.getInstance().time}: $s")
-        } catch (e: Exception) {
-            val s = "Subprocess exited with error: ${e.localizedMessage}"
-            Logger.error(s)
-            lb.appendLine("\n${Calendar.getInstance().time}: $s")
-            outputPublisher.onError(e)
-        } finally {
-            val name = getProgramName(executable)
-            Logger.logToFile(
-                text = lb.toString(),
-                args = userArgs,
-                directory = wdp,
-                callerKey = callerKey,
-                uid = executable.uid,
-                cmdCode = -1,
-                name = name
-            )
-            endSession(callerKey)
-        }
-    }
-
-    /**
      * Executes an explicit async command, meaning it does not come from the loaded config's
      * program/command maps
      *
+     * @param callerKey unique caller UID
      * @param programPath full system path to the desired command
-     * @param args arguments to accompany the command path
-     * @param workingDir directory from which the command should be executed
-     * @param callerKey unique caller identification key
-     * @param env map of any environment variables to be added to the execution
      * @param outputPublisher Rx publisher through which output is routed
+     * @param workingDir directory from which the command should be executed
+     * @param args arguments to accompany the command path
+     * @param env map of any environment variables to be added to the execution
      * @param retainConfigEnvironment flag for config env variable retention
      */
-    fun executeExplicitRx(
+    fun executeAsync(
         callerKey: String,
         programPath: String,
-        args: List<String>,
-        workingDir: String,
-        env: Map<String, String> = mutableMapOf(),
         outputPublisher: BehaviorProcessor<String>,
+        workingDir: String = IngenConfig.INGEN_DEFAULT_DIR,
+        args: List<String> = listOf(),
+        env: Map<String, String> = mutableMapOf(),
         retainConfigEnvironment: Boolean = true
     ) {
         val lb = StringBuilder()
@@ -363,119 +295,28 @@ class Commander(configuration: IngenConfig? = null) {
     }
 
     /**
-     * Spawns an asynchronous, interactive subprocess that include Rx input
-     * publishing routes for sending data to the subprocess during its
-     * runtime, while being bound to the coroutine scope of the caller
+     * Identical behavior to , except this method allows
+     * for the specification of all elements of a subprocess/command as opposed
+     * to relying on the commands listed within the configuration files
      *
-     * @param executable subprocess command object
-     * @param userArgs command arguments
-     * @param inputPublisher input route for subprocess STDIN
-     * @param outputPublisher output route for subprocess STDOUT
-     * @param receiverScope coroutine scope of caller
-     */
-    fun executeInteractive(
-        callerKey: String,
-        executable: ISubprocess,
-        userArgs: List<String>,
-        env: Map<String, String> = mutableMapOf(),
-        inputPublisher: BehaviorProcessor<String>,
-        outputPublisher: BehaviorProcessor<String>,
-        receiverScope: CoroutineScope = GlobalScope,
-        retainConfigEnvironment: Boolean = true
-    ) {
-        val lb = StringBuilder()
-        val args = buildArguments(executable, userArgs)
-        val wdp = getWorkingDirectoryPath(executable)
-        try {
-            val pb = buildProcess(
-                workingDir = wdp,
-                args = args,
-                env = env,
-                retainConfigEnvironment = retainConfigEnvironment
-            )
-            val process = pb.start()
-            addSubprocess(callerKey, process)
-
-            // background job for accepting input and writing to subproc STDIN
-            receiverScope.launch {
-                inputPublisher.subscribe { sig ->
-                    if (sig == "SIGKILL") {
-                        process.outputStream.close()
-                        process.inputStream.close()
-                        process.errorStream.close()
-                        process.destroy()
-                    }
-                    Logger.debug("Input queued: $sig")
-                    with(process.outputStream.bufferedWriter()) {
-                        write(sig)
-                        newLine()
-                        flush()
-                    }
-                }
-            }
-
-            process.inputStream.bufferedReader().forEachLine { string ->
-                if (string.isNotBlank()) {
-                    Logger.debug("[CMDR] CGI process output received: $string")
-                    val s = "${Calendar.getInstance().time}: $string"
-                    lb.appendLine(s)
-                    outputPublisher.onNext(string)
-                }
-            }
-
-            process.errorStream.bufferedReader().forEachLine { string ->
-                Logger.error("[CMDR] CGI process error received: $string")
-                lb.appendLine("${Calendar.getInstance().time}: $string")
-                outputPublisher.onNext(string)
-            }
-
-            val exitVal = process.waitFor()
-            val s = "Subprocess exited with code: $exitVal"
-            Logger.debug(s)
-            lb.appendLine("\n${Calendar.getInstance().time}: $s")
-            outputPublisher.onComplete()
-        } catch (e: Exception) {
-            val s = "Subprocess exited with error: ${e.localizedMessage}"
-            Logger.error(s)
-            lb.appendLine("\n${Calendar.getInstance().time}: $s")
-        } finally {
-            val name = getProgramName(executable)
-            Logger.logToFile(
-                text = lb.toString(),
-                args = userArgs,
-                directory = wdp,
-                callerKey = callerKey,
-                uid = executable.uid,
-                cmdCode = -1,
-                name = name
-            )
-            endSession(callerKey)
-        }
-    }
-
-    /**
-     * Identical behavior to [executeInteractive], except this overload allows
-     * the caller to specify all elements of a subprocess/command as opposed to
-     * relying on the configuration files
-     *
-     * @param programPath path to command, ex. /bin/python
-     * @param args command arguments, with alias at index 0 if needed
-     * @param workingDir working directory from which to execute command
      * @param callerKey caller ID key
-     * @param env any environment variables to be added to [ProcessBuilder]
-     * @param inputPublisher input route for subprocess STDIN
+     * @param programPath path to command, ex. /bin/python
      * @param outputPublisher output route for subprocess STDOUT
+     * @param inputPublisher input route for subprocess STDIN
+     * @param workingDir working directory from which to execute command
+     * @param args command arguments, with alias at index 0 if needed
+     * @param env any environment variables to be added to [ProcessBuilder]
      * @param receiverScope coroutine scope of caller
      * @param retainConfigEnvironment retain all env variables from config
      */
-    fun executeExplicitInteractive(
+    fun executeInteractive(
         callerKey: String,
         programPath: String,
-        args: List<String>,
-        workingDir: String,
-        env: Map<String, String> = mutableMapOf(),
-        inputPublisher: BehaviorProcessor<String>,
         outputPublisher: BehaviorProcessor<String>,
+        inputPublisher: BehaviorProcessor<String>,
+        workingDir: String = IngenConfig.INGEN_DEFAULT_DIR,
+        args: List<String> = listOf(),
+        env: Map<String, String> = mutableMapOf(),
         receiverScope: CoroutineScope = GlobalScope,
         retainConfigEnvironment: Boolean = true
     ) {
@@ -557,6 +398,7 @@ class Commander(configuration: IngenConfig? = null) {
      * Spawns a file watcher at the given directory, and notifies when files are created, modified, or deleted; will
      * also echo the contents, if requested
      *
+     * @param callerKey unique caller UID
      * @param watchDirectory directory to watch for changes
      * @param outputPublisher Rx publisher for output to caller
      * @param killChannel coroutines channel for killing the watcher process, when needed
@@ -671,7 +513,7 @@ class Commander(configuration: IngenConfig? = null) {
     }
 
     /**
-     * Ends all processes executed by a given caller, forcibly if desire
+     * Ends all processes executed by a given caller, forcibly if desired
      *
      * @param callerKey unique caller identification key
      * @param forcible flag for forcible process destruction
@@ -769,6 +611,8 @@ class Commander(configuration: IngenConfig? = null) {
      *
      * @param workingDir working directory from which to spawn the process
      * @param args full set of built arguments, including needed paths
+     * @param env environment vars supplied by caller, if any
+     * @param retainConfigEnvironment whether to retain the env vars from the config file
      * @param redirectInput process input (STDIO) redirection flag
      * @param redirectOutput process output (STDIO) redirection flag
      * @param redirectError process error (STDERR) redirection flag

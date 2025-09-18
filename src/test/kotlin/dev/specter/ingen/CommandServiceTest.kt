@@ -56,37 +56,7 @@ class CommandServiceTest {
     fun test_service_execute_async() {
         val out = arrayListOf<String>()
         val route = IORoute(BehaviorProcessor.create(), null)
-        val request = IExecRequest.create(key = "01010", uid = 2)
-        composite.add(
-            route.first.toObservable()
-                .toFlowable(BackpressureStrategy.BUFFER)
-                .subscribeBy(
-                    onNext = {
-                        println("*** Test I/O: $it ***")
-                        out.add(it)
-                    },
-                    onError = {
-                        fail("Flowable test error: ${it.localizedMessage}")
-                    },
-                    onComplete = {}
-                )
-        )
-        val job = GlobalScope.async {
-            CommandService.executeAsync(request = request, ioRoute = route)
-        }
-
-        runTest {
-            job.start()
-            job.await()
-            assert(out.size == CommanderTest.EXPECTED_ASYNC_OUTPUT_SIZE)
-        }
-    }
-
-    @Test
-    fun test_service_execute_async_explicit() {
-        val out = arrayListOf<String>()
-        val route = IORoute(BehaviorProcessor.create(), null)
-        val request = IExecRequestExplicit.create(
+        val request = ILaunchRequest.create(
             key = "01011",
             path = PYTHON_PATH,
             directory = IngenConfig.INGEN_DEFAULT_DIR,
@@ -109,7 +79,7 @@ class CommandServiceTest {
         )
 
         val job = GlobalScope.async {
-            CommandService.executeExplicitAsync(request = request, ioRoute = route)
+            CommandService.executeAsync(request = request, ioRoute = route)
         }
 
         runTest {
@@ -120,11 +90,10 @@ class CommandServiceTest {
     }
 
     @Test
-    fun test_service_execute_interactive() {
+    fun test_create_request_from_uid_and_exec_interactive() {
         val out = arrayListOf<String>()
         val route = IORoute(BehaviorProcessor.create(), BehaviorProcessor.create())
-        val request = IExecRequest.create(key = "01012", uid = 1)
-
+        val request = ILaunchRequest.create(key = "01012", uid = 1)
         composite.add(
             route.first.toObservable()
                 .toFlowable(BackpressureStrategy.BUFFER)
@@ -150,7 +119,7 @@ class CommandServiceTest {
         }
 
         val job = GlobalScope.async {
-            CommandService.executeAsync(request = request, ioRoute = route)
+            CommandService.executeAsync(request = request!!, ioRoute = route)
         }
 
         runTest {
@@ -163,10 +132,10 @@ class CommandServiceTest {
     }
 
     @Test
-    fun test_service_execute_interactive_explicit() {
+    fun test_service_execute_interactive() {
         val out = arrayListOf<String>()
         val route = IORoute(BehaviorProcessor.create(), BehaviorProcessor.create())
-        val request = IExecRequestExplicit.create(
+        val request = ILaunchRequest.create(
             key = "01012",
             path = PYTHON_PATH,
             directory = IngenConfig.INGEN_DEFAULT_DIR,
@@ -197,15 +166,13 @@ class CommandServiceTest {
             route.second!!.onNext("xx")
         }
 
-        val job = GlobalScope.async {
-            CommandService.executeExplicitAsync(request = request, ioRoute = route)
+        GlobalScope.async {
+            CommandService.executeAsync(request = request, ioRoute = route)
         }
 
         runTest {
-            job.start()
             job2.start()
             job2.await()
-            job.await()
             assert(out.isNotEmpty())
         }
     }
@@ -216,7 +183,7 @@ class CommandServiceTest {
         val route2 = IORoute(BehaviorProcessor.create(), null)
         val wd = "${TestConstants.TEST_MODULE_DIR}/fw"
         val request = IFileWatchRequest.create(key = "10102", directory = wd)
-        val request2 = IExecRequestExplicit.create(
+        val request2 = ILaunchRequest.create(
             key = "101110",
             path = PYTHON_PATH,
             directory = IngenConfig.INGEN_DEFAULT_DIR,
@@ -257,7 +224,7 @@ class CommandServiceTest {
         }
 
         val job2 = GlobalScope.async {
-            CommandService.executeExplicitAsync(request = request2, ioRoute = route2, scope = this)
+            CommandService.executeAsync(request = request2, ioRoute = route2, scope = this)
         }
 
         runTest {

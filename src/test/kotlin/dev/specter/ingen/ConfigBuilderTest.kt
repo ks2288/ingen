@@ -16,7 +16,6 @@ class ConfigBuilderTest {
 
     @Test
     fun test_build_commands() {
-
         val commands = ConfigBuilder.buildSubprocesses(TestConstants.TEST_COMMANDS_JSON_PATH)
         commands?.let { c ->
             c.forEach {

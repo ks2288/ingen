@@ -112,42 +112,6 @@ class CommanderTest {
      * subprocesses; see `process.waitFor() within [Commander] to understand the points of interest in this regard
      */
     @Test
-    fun test_execute_rx() {
-        val op = BehaviorProcessor.create<String>()
-        val exec = Subprocess(
-            command = mockAsyncCommandRx,
-            uid = "112",
-        )
-        idGenCount += 1
-        val out = arrayListOf<String>()
-
-        composite.add(
-            op.toObservable()
-                .toFlowable(BackpressureStrategy.BUFFER)
-                .subscribeBy(
-                    onNext = {
-                        println("*** I/O: $it ***")
-                        out.add(it)
-                    },
-                    onError = {
-                        commander.killAll()
-                        fail()
-                    },
-                    onComplete = {}
-                )
-        )
-
-        commander.executeRx(
-            callerKey = "1234",
-            executable = exec,
-            userArgs = listOf(),
-            outputPublisher = op
-        )
-
-        runTest { assert(out.size == EXPECTED_ASYNC_OUTPUT_SIZE) }
-    }
-
-    @Test
     fun test_execute_explicit_rx() {
         val out = arrayListOf<String>()
         val op = BehaviorProcessor.create<String>()
@@ -168,7 +132,7 @@ class CommanderTest {
                 )
         )
 
-        commander.executeExplicitRx(
+        commander.executeAsync(
             programPath = PYTHON_PATH,
             args = listOf(EXPLICIT_RX_SCRIPT_PATH),
             workingDir = IngenConfig.INGEN_DEFAULT_DIR,
@@ -204,7 +168,7 @@ class CommanderTest {
         )
 
         runTest {
-            commander.executeExplicitRx(
+            commander.executeAsync(
                 programPath = PYTHON_PATH,
                 args = listOf(EXPLICIT_RX_SCRIPT_PATH2),
                 workingDir = IngenConfig.INGEN_DEFAULT_DIR,
@@ -251,7 +215,7 @@ class CommanderTest {
 
         // simulated service thread wrapper
         thread {
-            commander.executeExplicitInteractive(
+            commander.executeInteractive(
                 programPath = PYTHON_PATH,
                 args = listOf(INTERACTIVE_MODULE_PATH),
                 workingDir = IngenConfig.INGEN_DEFAULT_DIR,
@@ -278,7 +242,6 @@ class CommanderTest {
         private const val EXPECTED_INPUT_RESULT_SIZE_PYTHON = 2
         private val EXPLICIT_RX_SCRIPT_PATH =
             "${TestConstants.TEST_RES_DIR}/test_emitter.py"
-        const val EXPECTED_ASYNC_OUTPUT_SIZE = 10
         const val EXPECTED_EXPLICIT_RX_RESULTS_SIZE = 5
         val EXPLICIT_RX_SCRIPT_PATH2 =
             "${TestConstants.TEST_RES_DIR}/test_async_emitter.py"

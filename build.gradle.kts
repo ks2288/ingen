@@ -17,8 +17,8 @@ plugins {
     id("maven-publish")
 }
 
-group = "com.github.ks288"
-version = "1.2.3"
+group = "com.github.ks2288"
+version = "1.3.0-SNAPSHOT"
 
 dependencies {
     api("$kotlinxCoroutinesCoreName: $kotlinxVersion")

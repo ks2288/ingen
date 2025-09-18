@@ -70,7 +70,7 @@ class FileOpsTest {
 
         // block main thread and run test scenario with separate subprocess
         runTest {
-            commander.executeExplicitRx(
+            commander.executeAsync(
                 programPath = PYTHON_PATH,
                 args = listOf(TEST_FILE_WRITER_PATH, "${TestConstants.TEST_MODULE_DIR}/fw"),
                 workingDir = IngenConfig.INGEN_DEFAULT_DIR,
