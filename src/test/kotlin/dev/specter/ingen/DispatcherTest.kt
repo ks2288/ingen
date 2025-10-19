@@ -25,7 +25,7 @@ import kotlin.test.fail
  * Refer to this test for understanding the usage within the context of an application that
  * implements this library; each of the core functionalities of Ingen is tested here
  */
-class CommandServiceTest {
+class DispatcherTest {
     private lateinit var composite: CompositeDisposable
 
     @Before
@@ -35,7 +35,7 @@ class CommandServiceTest {
 
     @After
     fun teardown() {
-        CommandService.teardown { composite.dispose() }
+        Dispatcher.teardown { composite.dispose() }
     }
 
     /**
@@ -59,7 +59,7 @@ class CommandServiceTest {
         val request = ILaunchRequest.create(
             key = "01011",
             path = PYTHON_PATH,
-            directory = IngenConfig.INGEN_DEFAULT_DIR,
+            directory = IngenConfig.INGEN_DEFAULT_DIR, // this has a default; explicitly passed for clarity
             args = listOf(CommanderTest.EXPLICIT_RX_SCRIPT_PATH2)
         )
 
@@ -79,7 +79,7 @@ class CommandServiceTest {
         )
 
         val job = GlobalScope.async {
-            CommandService.executeAsync(request = request, ioRoute = route)
+            Dispatcher.executeAsync(request = request, ioRoute = route)
         }
 
         runTest {
@@ -119,7 +119,7 @@ class CommandServiceTest {
         }
 
         val job = GlobalScope.async {
-            CommandService.executeAsync(request = request!!, ioRoute = route)
+            Dispatcher.executeAsync(request = request!!, ioRoute = route)
         }
 
         runTest {
@@ -167,7 +167,7 @@ class CommandServiceTest {
         }
 
         GlobalScope.async {
-            CommandService.executeAsync(request = request, ioRoute = route)
+            Dispatcher.executeAsync(request = request, ioRoute = route)
         }
 
         runTest {
@@ -220,11 +220,11 @@ class CommandServiceTest {
         )
 
         GlobalScope.launch {
-            CommandService.watchFiles(request = request, route = route, scope = this)
+            Dispatcher.watchFiles(request = request, route = route, scope = this)
         }
 
         val job2 = GlobalScope.async {
-            CommandService.executeAsync(request = request2, ioRoute = route2, scope = this)
+            Dispatcher.executeAsync(request = request2, ioRoute = route2, scope = this)
         }
 
         runTest {

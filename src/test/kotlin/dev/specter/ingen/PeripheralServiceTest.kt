@@ -25,7 +25,7 @@ class PeripheralServiceTest {
 
     @After
     fun teardown() {
-        CommandService.teardown()
+        Dispatcher.teardown()
     }
 
     @Test

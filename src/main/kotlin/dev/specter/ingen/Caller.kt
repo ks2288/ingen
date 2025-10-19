@@ -98,7 +98,7 @@ interface IPeripheralService {
             return
         }
         scope.launch {
-            CommandService.executeAsync(
+            Dispatcher.executeAsync(
                 request = req,
                 ioRoute = IORoute(op, null),
                 scope = this
@@ -114,7 +114,7 @@ interface IPeripheralService {
      */
     fun stop(postRun: (() -> Unit)? = null) {
         compositeDisposable.dispose()
-        CommandService.disposeForCaller(key = key)
+        Dispatcher.disposeForCaller(key = key)
         postRun?.invoke()
     }
 }

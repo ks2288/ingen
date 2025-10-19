@@ -8,6 +8,9 @@ import dev.specter.ingen.util.Logger
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import kotlinx.coroutines.*
 
+// type alias for backward-compatibility
+typealias CommandService = Dispatcher
+
 /**
  * Contract for all service implementations managing callers and their requested subprocess
  * executions; in the simplest of circumstances with a single kiosked app leveraging this lib,
@@ -22,7 +25,7 @@ import kotlinx.coroutines.*
  * @property commander commander object for native subprocess execution
  * @property processorMap map of all callers and their corresponding publishers
  */
-interface ICommandService {
+interface IDispatcher {
     val config: IngenConfig
     val commands: List<ISubprocess>
     val commander: Commander
@@ -124,11 +127,11 @@ interface ICommandService {
 }
 
 /**
- * Implementation of [ICommandService] to be used as a singleton within any application that implements
+ * Implementation of [IDispatcher] to be used as a singleton within any application that implements
  * this library; can be tested on its own (as done within this library code) or mocked via its parent \
  * interface to support complex unit testing untethered from a native Linux system
  */
-object CommandService : ICommandService {
+object Dispatcher : IDispatcher {
     override val config: IngenConfig = ConfigBuilder.buildConfig()
     override val commands: List<ISubprocess> =
         ConfigBuilder.buildSubprocesses() ?: listOf()

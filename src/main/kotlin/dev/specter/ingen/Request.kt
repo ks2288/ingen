@@ -41,7 +41,7 @@ interface ILaunchRequest {
             ConfigBuilder.buildSubprocesses()
                 ?.first{ it.uid == uid.toString() }
                 ?.let { sp ->
-                    val prog = CommandService.config.paths.entries.first { p ->
+                    val prog = Dispatcher.config.paths.entries.first { p ->
                         p.value.code == sp.command.programCode
                     }.value
                     create(
