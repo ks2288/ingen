@@ -6,7 +6,10 @@ import io.reactivex.rxjava3.core.BackpressureStrategy
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.processors.BehaviorProcessor
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 /**
  * Contract for all callers implementing this library, intending to make use of long-running, asynchronous
@@ -34,7 +37,7 @@ interface IPeripheralService {
     val dataPublisher: BehaviorProcessor<Any>
     val bpStrategy: BackpressureStrategy
         get() = BackpressureStrategy.LATEST
-    val inputProcessor: BehaviorProcessor<*>?
+    val inputProcessor: BehaviorProcessor<String>?
         get() = null
     val launchArgs: List<String>
         get() = listOf()
@@ -100,9 +103,22 @@ interface IPeripheralService {
         scope.launch {
             Dispatcher.executeAsync(
                 request = req,
-                ioRoute = IORoute(op, null),
+                ioRoute = IORoute(op, inputProcessor),
                 scope = this
             )
+        }
+    }
+
+    /**
+     * Attempts to send an input signal through the local [inputProcessor], if instantiated, and
+     * records an error otherwise
+     *
+     * @param sig input signal to send, in string format
+     */
+    fun sendInputSignal(sig: String) {
+        inputProcessor?.onNext(sig) ?: kotlin.run {
+            Logger.error("Error sending input signal from client: $key" +
+                    "\n\tinputProcessor object null...")
         }
     }
 
